@@ -102,7 +102,7 @@ impl Swizzle2<8, 8> for Swizzle2_0xF0 {
     ];
 }
 
-const COMPRESS_STORE_SHUFFLE: [[usize; 8]; 256] = generate_shuffle();
+/*const COMPRESS_STORE_SHUFFLE: [[usize; 8]; 256] = generate_shuffle();
 
 const fn generate_shuffle() -> [[usize; 8]; 256] {
     let mut result = [[0; 8]; 256];
@@ -127,73 +127,88 @@ const fn generate_shuffle() -> [[usize; 8]; 256] {
     }
 
     result
-}
+}*/
 
 impl SimdCompare<u64, 8> for u64x8 {
     type OPMask = <Simd<u64, 8> as SimdPartialEq>::Mask;
 
+    #[inline]
     fn min(a: Self, b: Self) -> Self {
         a.simd_min(b)
     }
 
+    #[inline]
     fn max(a: Self, b: Self) -> Self {
         a.simd_max(b)
     }
 
+    #[inline]
     fn mask_mov(a: Self, b: Self, mask: fn(Self, Self) -> Self) -> Self {
         mask(a, b)
     }
 
+    #[inline]
     fn shuffle(a: Self, mask: fn(Self) -> Self) -> Self {
         mask(a)
     }
 
+    #[inline]
     fn loadu(data: &[u64]) -> Self {
         let idxs = usizex8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);
         let max_values = u64x8::splat(u64::MAX_VALUE);
         u64x8::gather_or(data, idxs, max_values)
     }
 
+    #[inline]
     fn storeu(input: Self, output: &mut [u64]) {
         let idxs = usizex8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);
         u64x8::scatter(input, output, idxs);
     }
 
+    #[inline]
     fn gather_from_idx(idx: [usize; 8], data: &[u64]) -> Self {
         let idxs = usizex8::from_array(idx);
         let max_values = u64x8::splat(u64::MAX_VALUE);
         u64x8::gather_or(data, idxs, max_values)
     }
 
+    #[inline]
     fn get_value_at_idx(input: Self, idx: usize) -> u64 {
         input[idx]
     }
 
+    #[inline]
     fn set(value: u64) -> Self {
         u64x8::splat(value)
     }
 
+    #[inline]
     fn ge(a: Self, b: Self) -> Self::OPMask {
         //Self::OPMask::from_int(Network64bit2::swizzle(a.simd_ge(b).to_int()))
         a.simd_ge(b)
     }
 
+    #[inline]
     fn ones_count(mask: Self::OPMask) -> usize {
         mask.to_bitmask().count_ones() as usize
     }
 
+    #[inline]
     fn not_mask(mask: Self::OPMask) -> Self::OPMask {
         !mask
     }
 
+    #[inline]
     fn reducemin(data: Self) -> u64 {
         data.reduce_min()
     }
 
+    #[inline]
     fn reducemax(data: Self) -> u64 {
         data.reduce_max()
     }
 
+    #[inline]
     fn mask_compressstoreu(array: &mut [u64], mask: Self::OPMask, vals: Self) {
         /*let idxs = usizex8::from_array(COMPRESS_STORE_SHUFFLE[mask.to_bitmask() as usize]);
 
@@ -1058,10 +1073,5 @@ mod tests {
             assert_eq!(&array, &result[..i]);
             println!("succeeded {}", i);
         }
-    }
-
-    #[test]
-    fn test_compress_store_shuffle() {
-        println!("{:?}", COMPRESS_STORE_SHUFFLE);
     }
 }

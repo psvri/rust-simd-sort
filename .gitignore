@@ -1,1 +1,4 @@
 /target
+/del
+/.vscode
+Cargo.lock

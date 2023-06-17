@@ -64,6 +64,7 @@ pub(crate) fn comparison_func<T: SimdSortable>(a: &T, b: &T) -> Ordering {
 ///
 /// COEX == Compare and Exchange two registers by swapping min and max values
 ///
+#[inline]
 pub(crate) fn coex<T: SimdSortable, const N: usize, U: SimdCompare<T, N>>(a: &mut U, b: &mut U) {
     let temp = *a;
     *a = U::min(*a, *b);
