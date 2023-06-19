@@ -1,6 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use rand::{distributions::Uniform, Rng};
-use simd_sort::{self, platform::nightly::PortableSimdSort};
+use simd_sort::{
+    self, platform::nightly::portable_simd_sort_i64, platform::x86::avx2::avx2_sort_i64,
+};
 
 pub fn create_uniform_data() -> Vec<u64> {
     let mut rng = rand::thread_rng();
@@ -9,19 +11,23 @@ pub fn create_uniform_data() -> Vec<u64> {
     vals
 }
 
-pub fn sort_unstable(data: &mut [u64]) {
-    data.sort_unstable();
+pub fn create_uniform_data_i64() -> Vec<i64> {
+    let mut rng = rand::thread_rng();
+    let range = Uniform::new(0, 1024 * 1024);
+    let vals: Vec<i64> = (0..1024 * 1024).map(|_| rng.sample(&range)).collect();
+    vals
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let data = create_uniform_data();
+    let data = create_uniform_data_i64();
     let data1 = data.clone();
+    let data2 = data.clone();
     c.bench_function("std_unstable_sort", move |b| {
         // This will avoid timing the to_vec call.
         b.iter_batched(
             || data1.clone(),
             |mut data| {
-                sort_unstable(black_box(data.as_mut_slice()));
+                data.sort_unstable();
                 black_box(data);
             },
             BatchSize::LargeInput,
@@ -31,10 +37,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("portable_simd_sort", move |b| {
         // This will avoid timing the to_vec call.
         b.iter_batched(
+            || data2.clone(),
+            |mut data| {
+                portable_simd_sort_i64(data.as_mut_slice());
+                black_box(data);
+            },
+            BatchSize::LargeInput,
+        )
+    });
+
+    c.bench_function("avx2", move |b| {
+        // This will avoid timing the to_vec call.
+        b.iter_batched(
             || data.clone(),
             |mut data| {
-                data.as_mut_slice().sort_portable_simd();
-                black_box(data);
+                avx2_sort_i64(black_box(data.as_mut_slice()));
             },
             BatchSize::LargeInput,
         )
