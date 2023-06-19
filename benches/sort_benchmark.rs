@@ -51,7 +51,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter_batched(
             || data.clone(),
             |mut data| {
-                avx2_sort_i64(black_box(data.as_mut_slice()));
+                avx2_sort_i64(data.as_mut_slice());
+                black_box(data);
             },
             BatchSize::LargeInput,
         )
