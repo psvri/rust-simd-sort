@@ -1,3 +1,5 @@
+use std::cmp;
+
 use crate::{cmp_merge, coex, partition_avx512, SimdCompare, SimdSortable};
 
 pub(crate) trait Bit64Element: SimdSortable {}
@@ -211,9 +213,9 @@ where
     T: Bit64Element,
     U: Bit64Simd<T> + SimdCompare<T, 8>,
 {
-    let simd = U::loadu(data);
+    let simd = U::mask_loadu(data);
     let zmm = sort_zmm_64bit(simd);
-    U::storeu(zmm, data);
+    U::mask_storeu(zmm, data);
 }
 
 pub(crate) fn sort_16<T, U>(data: &mut [T])
@@ -226,13 +228,13 @@ where
     } else {
         let zmm = data.split_at_mut(8);
         let mut zmm1 = U::loadu(zmm.0);
-        let mut zmm2 = U::loadu(zmm.1);
+        let mut zmm2 = U::mask_loadu(zmm.1);
         zmm1 = sort_zmm_64bit(zmm1);
         zmm2 = sort_zmm_64bit(zmm2);
 
         bitonic_merge_two_zmm_64bit(&mut zmm1, &mut zmm2);
         U::storeu(zmm1, zmm.0);
-        U::storeu(zmm2, zmm.1);
+        U::mask_storeu(zmm2, zmm.1);
     }
 }
 
@@ -241,25 +243,19 @@ where
     T: Bit64Element,
     U: Bit64Simd<T> + SimdCompare<T, 8>,
 {
-    let mut max_value_array: [T; 8] = [T::MAX_VALUE; 8];
     if data.len() <= 16 {
         sort_16::<T, U>(data);
         return;
     };
     let (data_16_0, data_16_1) = data.split_at_mut(16);
     let (data_8_0, data_8_1) = data_16_0.split_at_mut(8);
-    let (data_8_2, data_8_3) = {
-        if data_16_1.len() > 8 {
-            data_16_1.split_at_mut(8)
-        } else {
-            (data_16_1, max_value_array.as_mut_slice())
-        }
-    };
+    let index_2 = cmp::min(data_16_1.len(), 8);
+    let (data_8_2, data_8_3) = data_16_1.split_at_mut(index_2);
 
     let mut zmm_0 = U::loadu(data_8_0);
     let mut zmm_1 = U::loadu(data_8_1);
-    let mut zmm_2 = U::loadu(data_8_2);
-    let mut zmm_3 = U::loadu(data_8_3);
+    let mut zmm_2 = U::mask_loadu(data_8_2);
+    let mut zmm_3 = U::mask_loadu(data_8_3);
 
     zmm_0 = sort_zmm_64bit(zmm_0);
     zmm_1 = sort_zmm_64bit(zmm_1);
@@ -273,8 +269,8 @@ where
 
     U::storeu(zmm[0], data_8_0);
     U::storeu(zmm[1], data_8_1);
-    U::storeu(zmm[2], data_8_2);
-    U::storeu(zmm[3], data_8_3);
+    U::mask_storeu(zmm[2], data_8_2);
+    U::mask_storeu(zmm[3], data_8_3);
 }
 
 pub(crate) fn sort_64<T, U>(data: &mut [T])
@@ -299,35 +295,19 @@ where
     zmm_2 = sort_zmm_64bit(zmm_2);
     zmm_3 = sort_zmm_64bit(zmm_3);
 
-    let mut max_value_array: [T; 24] = [T::MAX_VALUE; 24];
-    let max_value_array_t = &mut max_value_array[..];
-    let (data_8_4, data_8_5, data_8_6, data_8_7) = {
-        if data_32_1.len() < 8 {
-            let (x, max_value_array_t) = max_value_array_t.split_at_mut(8);
-            let (y, max_value_array_t) = max_value_array_t.split_at_mut(8);
-            let (z, _) = max_value_array_t.split_at_mut(8);
-            (data_32_1, x, y, z)
-        } else if data_32_1.len() < 16 {
-            let (x, y) = data_32_1.split_at_mut(8);
-            let (z, max_value_array_t) = max_value_array_t.split_at_mut(8);
-            let (w, _) = max_value_array_t.split_at_mut(8);
-            (x, y, z, w)
-        } else if data_32_1.len() < 24 {
-            let (x, data_32_1) = data_32_1.split_at_mut(8);
-            let (y, z) = data_32_1.split_at_mut(8);
-            let (w, _) = max_value_array_t.split_at_mut(8);
-            (x, y, z, w)
-        } else {
-            let (x, data_32_1) = data_32_1.split_at_mut(8);
-            let (y, data_32_1) = data_32_1.split_at_mut(8);
-            let (z, w) = data_32_1.split_at_mut(8);
-            (x, y, z, w)
-        }
-    };
-    let mut zmm_4 = U::loadu(data_8_4);
-    let mut zmm_5 = U::loadu(data_8_5);
-    let mut zmm_6 = U::loadu(data_8_6);
-    let mut zmm_7 = U::loadu(data_8_7);
+    let split_index = cmp::min(data_32_1.len(), 8);
+    let (data_8_4, data_32_1) = data_32_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_32_1.len(), 8);
+    let (data_8_5, data_32_1) = data_32_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_32_1.len(), 8);
+    let (data_8_6, data_8_7) = data_32_1.split_at_mut(split_index);
+
+    let mut zmm_4 = U::mask_loadu(data_8_4);
+    let mut zmm_5 = U::mask_loadu(data_8_5);
+    let mut zmm_6 = U::mask_loadu(data_8_6);
+    let mut zmm_7 = U::mask_loadu(data_8_7);
     zmm_4 = sort_zmm_64bit(zmm_4);
     zmm_5 = sort_zmm_64bit(zmm_5);
     zmm_6 = sort_zmm_64bit(zmm_6);
@@ -350,10 +330,10 @@ where
     U::storeu(zmm[1], data_8_1);
     U::storeu(zmm[2], data_8_2);
     U::storeu(zmm[3], data_8_3);
-    U::storeu(zmm[4], data_8_4);
-    U::storeu(zmm[5], data_8_5);
-    U::storeu(zmm[6], data_8_6);
-    U::storeu(zmm[7], data_8_7);
+    U::mask_storeu(zmm[4], data_8_4);
+    U::mask_storeu(zmm[5], data_8_5);
+    U::mask_storeu(zmm[6], data_8_6);
+    U::mask_storeu(zmm[7], data_8_7);
 }
 
 pub(crate) fn sort_128<T, U>(data: &mut [T])
@@ -367,8 +347,27 @@ where
     }
 
     let (data_64_0, data_64_1) = data.split_at_mut(64);
-    let (data_8_0, data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7) =
-        split_64::<T, U>(data_64_0, &mut []);
+    let split_index = cmp::min(data_64_0.len(), 8);
+    let (data_8_0, data_64_0) = data_64_0.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_0.len(), 8);
+    let (data_8_1, data_64_0) = data_64_0.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_0.len(), 8);
+    let (data_8_2, data_64_0) = data_64_0.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_0.len(), 8);
+    let (data_8_3, data_64_0) = data_64_0.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_0.len(), 8);
+    let (data_8_4, data_64_0) = data_64_0.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_0.len(), 8);
+    let (data_8_5, data_64_0) = data_64_0.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_0.len(), 8);
+    let (data_8_6, data_8_7) = data_64_0.split_at_mut(split_index);
+
     let mut zmm_0 = U::loadu(data_8_0);
     let mut zmm_1 = U::loadu(data_8_1);
     let mut zmm_2 = U::loadu(data_8_2);
@@ -386,17 +385,35 @@ where
     zmm_6 = sort_zmm_64bit(zmm_6);
     zmm_7 = sort_zmm_64bit(zmm_7);
 
-    let mut max_value_array: [T; 64] = [T::MAX_VALUE; 64];
-    let (data_8_8, data_8_9, data_8_10, data_8_11, data_8_12, data_8_13, data_8_14, data_8_15) =
-        split_64::<T, U>(data_64_1, &mut max_value_array);
-    let mut zmm_8 = U::loadu(data_8_8);
-    let mut zmm_9 = U::loadu(data_8_9);
-    let mut zmm_10 = U::loadu(data_8_10);
-    let mut zmm_11 = U::loadu(data_8_11);
-    let mut zmm_12 = U::loadu(data_8_12);
-    let mut zmm_13 = U::loadu(data_8_13);
-    let mut zmm_14 = U::loadu(data_8_14);
-    let mut zmm_15 = U::loadu(data_8_15);
+    let split_index = cmp::min(data_64_1.len(), 8);
+    let (data_8_8, data_64_1) = data_64_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_1.len(), 8);
+    let (data_8_9, data_64_1) = data_64_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_1.len(), 8);
+    let (data_8_10, data_64_1) = data_64_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_1.len(), 8);
+    let (data_8_11, data_64_1) = data_64_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_1.len(), 8);
+    let (data_8_12, data_64_1) = data_64_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_1.len(), 8);
+    let (data_8_13, data_64_1) = data_64_1.split_at_mut(split_index);
+
+    let split_index = cmp::min(data_64_1.len(), 8);
+    let (data_8_14, data_8_15) = data_64_1.split_at_mut(split_index);
+
+    let mut zmm_8 = U::mask_loadu(data_8_8);
+    let mut zmm_9 = U::mask_loadu(data_8_9);
+    let mut zmm_10 = U::mask_loadu(data_8_10);
+    let mut zmm_11 = U::mask_loadu(data_8_11);
+    let mut zmm_12 = U::mask_loadu(data_8_12);
+    let mut zmm_13 = U::mask_loadu(data_8_13);
+    let mut zmm_14 = U::mask_loadu(data_8_14);
+    let mut zmm_15 = U::mask_loadu(data_8_15);
     zmm_8 = sort_zmm_64bit(zmm_8);
     zmm_9 = sort_zmm_64bit(zmm_9);
     zmm_10 = sort_zmm_64bit(zmm_10);
@@ -446,124 +463,14 @@ where
     U::storeu(zmm[5], data_8_5);
     U::storeu(zmm[6], data_8_6);
     U::storeu(zmm[7], data_8_7);
-    U::storeu(zmm[8], data_8_8);
-    U::storeu(zmm[9], data_8_9);
-    U::storeu(zmm[10], data_8_10);
-    U::storeu(zmm[11], data_8_11);
-    U::storeu(zmm[12], data_8_12);
-    U::storeu(zmm[13], data_8_13);
-    U::storeu(zmm[14], data_8_14);
-    U::storeu(zmm[15], data_8_15);
-}
-
-#[inline]
-fn split_64<'a, T, U>(
-    data: &'a mut [T],
-    max_value_array_t: &'a mut [T],
-) -> (
-    &'a mut [T],
-    &'a mut [T],
-    &'a mut [T],
-    &'a mut [T],
-    &'a mut [T],
-    &'a mut [T],
-    &'a mut [T],
-    &'a mut [T],
-)
-where
-    T: Bit64Element,
-    U: SimdCompare<T, 8> + Bit64Simd<T>,
-{
-    if data.len() > 8 * 7 {
-        let (data_8_1, data) = data.split_at_mut(8);
-        let (data_8_2, data) = data.split_at_mut(8);
-        let (data_8_3, data) = data.split_at_mut(8);
-        let (data_8_4, data) = data.split_at_mut(8);
-        let (data_8_5, data) = data.split_at_mut(8);
-        let (data_8_6, data) = data.split_at_mut(8);
-        let (data_8_7, data_8_8) = data.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    } else if data.len() > 8 * 6 {
-        let (data_8_1, data) = data.split_at_mut(8);
-        let (data_8_2, data) = data.split_at_mut(8);
-        let (data_8_3, data) = data.split_at_mut(8);
-        let (data_8_4, data) = data.split_at_mut(8);
-        let (data_8_5, data) = data.split_at_mut(8);
-        let (data_8_6, data_8_7) = data.split_at_mut(8);
-        let (data_8_8, _) = max_value_array_t.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    } else if data.len() > 8 * 5 {
-        let (data_8_1, data) = data.split_at_mut(8);
-        let (data_8_2, data) = data.split_at_mut(8);
-        let (data_8_3, data) = data.split_at_mut(8);
-        let (data_8_4, data) = data.split_at_mut(8);
-        let (data_8_5, data_8_6) = data.split_at_mut(8);
-        let (data_8_7, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_8, _) = max_value_array_t.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    } else if data.len() > 8 * 4 {
-        let (data_8_1, data) = data.split_at_mut(8);
-        let (data_8_2, data) = data.split_at_mut(8);
-        let (data_8_3, data) = data.split_at_mut(8);
-        let (data_8_4, data_8_5) = data.split_at_mut(8);
-        let (data_8_6, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_7, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_8, _) = max_value_array_t.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    } else if data.len() > 8 * 3 {
-        let (data_8_1, data) = data.split_at_mut(8);
-        let (data_8_2, data) = data.split_at_mut(8);
-        let (data_8_3, data_8_4) = data.split_at_mut(8);
-        let (data_8_5, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_6, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_7, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_8, _) = max_value_array_t.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    } else if data.len() > 8 * 2 {
-        let (data_8_1, data) = data.split_at_mut(8);
-        let (data_8_2, data_8_3) = data.split_at_mut(8);
-        let (data_8_4, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_5, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_6, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_7, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_8, _) = max_value_array_t.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    } else if data.len() > 8 * 1 {
-        let (data_8_1, data_8_2) = data.split_at_mut(8);
-        let (data_8_3, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_4, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_5, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_6, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_7, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_8, _) = max_value_array_t.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    } else {
-        let data_8_1 = data;
-        let (data_8_2, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_3, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_4, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_5, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_6, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_7, max_value_array_t) = max_value_array_t.split_at_mut(8);
-        let (data_8_8, _) = max_value_array_t.split_at_mut(8);
-        (
-            data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7, data_8_8,
-        )
-    }
+    U::mask_storeu(zmm[8], data_8_8);
+    U::mask_storeu(zmm[9], data_8_9);
+    U::mask_storeu(zmm[10], data_8_10);
+    U::mask_storeu(zmm[11], data_8_11);
+    U::mask_storeu(zmm[12], data_8_12);
+    U::mask_storeu(zmm[13], data_8_13);
+    U::mask_storeu(zmm[14], data_8_14);
+    U::mask_storeu(zmm[15], data_8_15);
 }
 
 fn get_pivot_64bit<T, U>(data: &[T]) -> T
@@ -599,7 +506,7 @@ where
      * Resort to std::sort if quicksort isnt making any progress
      */
     if max_iters <= 0 {
-        data.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        data.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
         return;
     }
     /*

@@ -34,24 +34,24 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         )
     });
 
-    c.bench_function("portable_simd_sort", move |b| {
-        // This will avoid timing the to_vec call.
-        b.iter_batched(
-            || data2.clone(),
-            |mut data| {
-                portable_simd_sort_i64(data.as_mut_slice());
-                black_box(data);
-            },
-            BatchSize::LargeInput,
-        )
-    });
-
     c.bench_function("avx2", move |b| {
         // This will avoid timing the to_vec call.
         b.iter_batched(
             || data.clone(),
             |mut data| {
                 avx2_sort_i64(data.as_mut_slice());
+                black_box(data);
+            },
+            BatchSize::LargeInput,
+        )
+    });
+
+    c.bench_function("portable_simd_sort", move |b| {
+        // This will avoid timing the to_vec call.
+        b.iter_batched(
+            || data2.clone(),
+            |mut data| {
+                portable_simd_sort_i64(data.as_mut_slice());
                 black_box(data);
             },
             BatchSize::LargeInput,

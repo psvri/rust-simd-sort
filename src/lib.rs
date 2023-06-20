@@ -27,6 +27,9 @@ pub trait SimdCompare<T: SimdSortable, const NUM_LANES: usize>: Copy + Debug {
     fn loadu(data: &[T]) -> Self;
     fn storeu(input: Self, data: &mut [T]);
 
+    fn mask_loadu(data: &[T]) -> Self;
+    fn mask_storeu(input: Self, data: &mut [T]);
+
     fn gather_from_idx(idx: [usize; NUM_LANES], data: &[T]) -> Self;
 
     fn get_value_at_idx(input: Self, idx: usize) -> T;

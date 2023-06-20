@@ -1,3 +1,4 @@
+use core::slice;
 use std::simd::{
     i64x8, u64x8, usizex8, Simd, SimdInt, SimdOrd, SimdPartialEq, SimdPartialOrd, SimdUint,
     Swizzle, Swizzle2, ToBitMask,
@@ -124,15 +125,29 @@ impl SimdCompare<u64, 8> for u64x8 {
 
     #[inline]
     fn loadu(data: &[u64]) -> Self {
+        let mut values = [0; 8];
+        values.copy_from_slice(unsafe { slice::from_raw_parts(data.as_ptr(), 8) });
+        Self::from_array(values)
+    }
+
+    #[inline]
+    fn storeu(input: Self, output: &mut [u64]) {
+        unsafe {
+            slice::from_raw_parts_mut(output.as_mut_ptr(), 8).copy_from_slice(input.as_array())
+        }
+    }
+
+    #[inline]
+    fn mask_loadu(data: &[u64]) -> Self {
         let idxs = usizex8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);
         let max_values = u64x8::splat(u64::MAX_VALUE);
         u64x8::gather_or(data, idxs, max_values)
     }
 
     #[inline]
-    fn storeu(input: Self, output: &mut [u64]) {
+    fn mask_storeu(input: Self, data: &mut [u64]) {
         let idxs = usizex8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);
-        u64x8::scatter(input, output, idxs);
+        u64x8::scatter(input, data, idxs);
     }
 
     #[inline]
@@ -218,13 +233,27 @@ impl SimdCompare<i64, 8> for i64x8 {
 
     #[inline]
     fn loadu(data: &[i64]) -> Self {
+        let mut values = [0; 8];
+        values.copy_from_slice(unsafe { slice::from_raw_parts(data.as_ptr(), 8) });
+        Self::from_array(values)
+    }
+
+    #[inline]
+    fn storeu(input: Self, output: &mut [i64]) {
+        unsafe {
+            slice::from_raw_parts_mut(output.as_mut_ptr(), 8).copy_from_slice(input.as_array())
+        }
+    }
+
+    #[inline]
+    fn mask_loadu(data: &[i64]) -> Self {
         let idxs = usizex8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);
         let max_values = i64x8::splat(i64::MAX_VALUE);
         i64x8::gather_or(data, idxs, max_values)
     }
 
     #[inline]
-    fn storeu(input: Self, output: &mut [i64]) {
+    fn mask_storeu(input: Self, output: &mut [i64]) {
         let idxs = usizex8::from_array([0, 1, 2, 3, 4, 5, 6, 7]);
         i64x8::scatter(input, output, idxs);
     }
@@ -248,7 +277,6 @@ impl SimdCompare<i64, 8> for i64x8 {
 
     #[inline]
     fn ge(a: Self, b: Self) -> Self::OPMask {
-        //Self::OPMask::from_int(Network64bit2::swizzle(a.simd_ge(b).to_int()))
         a.simd_ge(b)
     }
 

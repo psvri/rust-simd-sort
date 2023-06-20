@@ -13,7 +13,7 @@ use std::{
 
 use crate::{bit_64::Bit64Simd, SimdCompare};
 
-const LOADU_MASK: [[i64; 8]; 8] = [
+const LOADU_MASK: [[i64; 8]; 9] = [
     [0, 0, 0, 0, 0, 0, 0, 0],
     [-1, 0, 0, 0, 0, 0, 0, 0],
     [-1, -1, 0, 0, 0, 0, 0, 0],
@@ -22,6 +22,7 @@ const LOADU_MASK: [[i64; 8]; 8] = [
     [-1, -1, -1, -1, -1, 0, 0, 0],
     [-1, -1, -1, -1, -1, -1, 0, 0],
     [-1, -1, -1, -1, -1, -1, -1, 0],
+    [-1, -1, -1, -1, -1, -1, -1, -1],
 ];
 
 const V_INDEX_1: [i64; 4] = [0, 1, 2, 3];
@@ -135,11 +136,26 @@ impl SimdCompare<i64, 8> for Avx2I64x2 {
 
     #[inline]
     fn loadu(data: &[i64]) -> Self {
-        Self::from(data)
+        unsafe {
+            let v1 = _mm256_loadu_si256(mem::transmute(data.as_ptr()));
+            let v2 = _mm256_loadu_si256(mem::transmute(data[4..].as_ptr()));
+            Self { values: [v1, v2] }
+        }
     }
 
     #[inline]
     fn storeu(input: Self, data: &mut [i64]) {
+        unsafe {
+            _mm256_storeu_si256(mem::transmute(data.as_ptr()), input.values[0]);
+            _mm256_storeu_si256(mem::transmute(data[4..].as_ptr()), input.values[1]);
+        }
+    }
+
+    fn mask_loadu(data: &[i64]) -> Self {
+        Self::from(data)
+    }
+
+    fn mask_storeu(input: Self, data: &mut [i64]) {
         unsafe {
             if data.len() >= 8 {
                 _mm256_storeu_si256(mem::transmute(data.as_ptr()), input.values[0]);
@@ -330,21 +346,15 @@ impl From<[i64; 8]> for Avx2I64x2 {
 impl From<&[i64]> for Avx2I64x2 {
     fn from(v: &[i64]) -> Self {
         unsafe {
-            if v.len() >= 8 {
-                let v1 = _mm256_loadu_si256(mem::transmute(v.as_ptr()));
-                let v2 = _mm256_loadu_si256(mem::transmute(v[4..].as_ptr()));
-                Self { values: [v1, v2] }
-            } else {
-                let mask = LOADU_MASK[v.len()];
-                let mask1 = _mm256_loadu_si256(mem::transmute(mask.as_ptr()));
-                let mask2 = _mm256_loadu_si256(mem::transmute(mask[4..].as_ptr()));
-                let indices1 = _mm256_loadu_si256(mem::transmute(V_INDEX_1.as_ptr()));
-                let indices2 = _mm256_loadu_si256(mem::transmute(V_INDEX_2.as_ptr()));
-                let max_values = _mm256_broadcastq_epi64(_mm_set1_epi64x(i64::MAX));
-                let v1 = _mm256_mask_i64gather_epi64(max_values, v.as_ptr(), indices1, mask1, 8);
-                let v2 = _mm256_mask_i64gather_epi64(max_values, v.as_ptr(), indices2, mask2, 8);
-                Self { values: [v1, v2] }
-            }
+            let mask = LOADU_MASK[v.len()];
+            let mask1 = _mm256_loadu_si256(mem::transmute(mask.as_ptr()));
+            let mask2 = _mm256_loadu_si256(mem::transmute(mask[4..].as_ptr()));
+            let indices1 = _mm256_loadu_si256(mem::transmute(V_INDEX_1.as_ptr()));
+            let indices2 = _mm256_loadu_si256(mem::transmute(V_INDEX_2.as_ptr()));
+            let max_values = _mm256_broadcastq_epi64(_mm_set1_epi64x(i64::MAX));
+            let v1 = _mm256_mask_i64gather_epi64(max_values, v.as_ptr(), indices1, mask1, 8);
+            let v2 = _mm256_mask_i64gather_epi64(max_values, v.as_ptr(), indices2, mask2, 8);
+            Self { values: [v1, v2] }
         }
     }
 }
@@ -435,7 +445,7 @@ mod test {
     #[test]
     fn test_loadu_storeu() {
         let mut input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = Avx2I64x2::from(input_slice.as_ref());
+        let first = Avx2I64x2::from(input_slice[..8].as_ref());
         assert_eq!(first, Avx2I64x2::from([1, 2, 3, 4, 5, 6, 7, 8]));
         Avx2I64x2::storeu(first, &mut input_slice[2..]);
         assert_eq!(input_slice, [1i64, 2, 1, 2, 3, 4, 5, 6, 7, 8]);
@@ -497,7 +507,7 @@ mod test {
     #[test]
     fn test_compress_store_u() {
         let input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = Avx2I64x2::from(input_slice.as_ref());
+        let first = Avx2I64x2::from(&input_slice[..8]);
         for i in 0..255 {
             let (mask, new_values) = generate_mask_answer(dbg!(i), &input_slice);
             let mask = Avx2I64x2::from(mask);
