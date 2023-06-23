@@ -6,6 +6,7 @@ pub(crate) mod utils;
 use std::{
     cmp::{max_by, min_by, Ordering},
     fmt::Debug,
+    mem::{self, MaybeUninit},
 };
 
 #[cfg(feature = "nightly")]
@@ -222,6 +223,145 @@ pub(crate) fn partition_avx512<T: SimdSortable, const N: usize, U: SimdCompare<T
         &mut max_vec,
     );
     l_store += N - amount_gt_pivot;
+    *smallest = U::reducemin(min_vec);
+    *biggest = U::reducemax(max_vec);
+    return l_store;
+}
+
+#[inline]
+pub(crate) fn partition_avx512_unrolled<T, const N: usize, U, const UNROLL: usize>(
+    data: &mut [T],
+    pivot: T,
+    smallest: &mut T,
+    biggest: &mut T,
+) -> usize
+where
+    T: SimdSortable,
+    U: SimdCompare<T, N>,
+{
+    let mut left = 0;
+    let mut right = data.len();
+    if right - left <= 2 * UNROLL * N {
+        return partition_avx512::<T, N, U>(data, pivot, smallest, biggest);
+    }
+    /* make array length divisible by 8*vtype::numlanes , shortening the array */
+
+    let mut i = (right - left) % (UNROLL * N);
+    while i > 0 {
+        *smallest = min_by(*smallest, data[left], comparison_func);
+        *biggest = max_by(*biggest, data[left], comparison_func);
+        if comparison_func(&data[left], &pivot) != Ordering::Less {
+            right -= 1;
+            data.swap(left, right);
+        } else {
+            left += 1;
+        }
+        i -= 1;
+    }
+
+    if left == right {
+        return left; /* less than N elements in the array */
+    }
+
+    let pivot_vec = U::set(pivot);
+    let mut min_vec = U::set(*smallest);
+    let mut max_vec = U::set(*biggest);
+
+    // We will now have atleast 16 registers worth of data to process:
+    // left and right vtype::numlanes values are partitioned at the end
+
+    let (vec_left, vec_right) = {
+        let mut vec_left: [MaybeUninit<U>; UNROLL] = unsafe { MaybeUninit::uninit().assume_init() };
+        let mut vec_right: [MaybeUninit<U>; UNROLL] =
+            unsafe { MaybeUninit::uninit().assume_init() };
+        for i in 0..UNROLL {
+            vec_left[i] = MaybeUninit::new(U::loadu(&data[(left + N * i)..]));
+            vec_right[i] = MaybeUninit::new(U::loadu(&data[(right - N * (UNROLL - i))..]));
+        }
+
+        (
+            unsafe { mem::transmute_copy::<_, [U; UNROLL]>(&vec_left) },
+            unsafe { mem::transmute_copy::<_, [U; UNROLL]>(&vec_right) },
+        )
+    };
+
+    // store points of the vectors
+    let mut r_store = right - N;
+    let mut l_store = left;
+
+    left += N * UNROLL;
+    right -= N * UNROLL;
+
+    while right - left != 0 {
+        let current_vec = {
+            let mut current_vec: [MaybeUninit<U>; UNROLL] =
+                unsafe { MaybeUninit::uninit().assume_init() };
+
+            /*
+             * if fewer elements are stored on the right side of the array,
+             * then next elements are loaded from the right side,
+             * otherwise from the left side
+             */
+            if (r_store + N) - right < left - l_store {
+                right -= UNROLL * N;
+                for i in 0..UNROLL {
+                    current_vec[i] = MaybeUninit::new(U::loadu(&data[(right + (N * i))..]));
+                }
+            } else {
+                for i in 0..UNROLL {
+                    current_vec[i] = MaybeUninit::new(U::loadu(&data[(left + (N * i))..]));
+                }
+                left += UNROLL * N;
+            }
+
+            unsafe { mem::transmute_copy::<_, [U; UNROLL]>(&current_vec) }
+        };
+
+        // partition the current vector and save it on both sides of the array
+        for i in 0..UNROLL {
+            let amount_ge_pivot = partition_vec(
+                data,
+                l_store,
+                r_store + N,
+                &current_vec[i],
+                &pivot_vec,
+                &mut min_vec,
+                &mut max_vec,
+            );
+            l_store += N - amount_ge_pivot;
+            r_store -= amount_ge_pivot;
+        }
+    }
+
+    //  partition and save vec_left[8] and vec_right[8]
+    for i in 0..UNROLL {
+        let amount_ge_pivot = partition_vec(
+            data,
+            l_store,
+            r_store + N,
+            &vec_left[i],
+            &pivot_vec,
+            &mut min_vec,
+            &mut max_vec,
+        );
+        l_store += N - amount_ge_pivot;
+        r_store -= amount_ge_pivot;
+    }
+
+    for i in 0..UNROLL {
+        let amount_ge_pivot = partition_vec(
+            data,
+            l_store,
+            r_store + N,
+            &vec_right[i],
+            &pivot_vec,
+            &mut min_vec,
+            &mut max_vec,
+        );
+        l_store += N - amount_ge_pivot;
+        r_store -= amount_ge_pivot;
+    }
+
     *smallest = U::reducemin(min_vec);
     *biggest = U::reducemax(max_vec);
     return l_store;

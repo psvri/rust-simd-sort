@@ -1,4 +1,4 @@
-use crate::bit_64::qsort_64bit_;
+use crate::bit_64::{qsort_64bit_, *};
 
 use self::bit_64::Avx2I64x2;
 
@@ -6,6 +6,14 @@ pub mod bit_64;
 
 pub fn avx2_sort_i64(data: &mut [i64]) {
     qsort_64bit_::<i64, Avx2I64x2>(data, f64::log2(data.len() as f64) as i64)
+}
+
+pub fn sort_128_asm(data: &mut [i64]) {
+    sort_128::<i64, Avx2I64x2>(data);
+}
+
+pub fn sort_8_asm(data: &mut [i64]) {
+    sort_8::<i64, Avx2I64x2>(data);
 }
 
 #[cfg(test)]
@@ -98,6 +106,20 @@ mod test {
             array.extend_from_slice(&result[..i]);
             array.reverse();
             sort_128::<i64, Avx2I64x2>(&mut array);
+            assert_eq!(&array, &result[..i]);
+            println!("succeeded {}", i);
+        }
+    }
+
+    #[test]
+    fn test_sort_256() {
+        let start = 0;
+        let result: Vec<i64> = (0i64..256).into_iter().collect();
+        for i in start..256 {
+            let mut array = Vec::with_capacity(i);
+            array.extend_from_slice(&result[..i]);
+            array.reverse();
+            sort_256::<i64, Avx2I64x2>(&mut array);
             assert_eq!(&array, &result[..i]);
             println!("succeeded {}", i);
         }

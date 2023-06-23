@@ -8,7 +8,7 @@ use std::{
         _mm256_xor_si256, _mm_blendv_pd, _mm_castpd_si128, _mm_castsi128_pd, _mm_cmpgt_epi64,
         _mm_extract_epi64, _mm_set1_epi64x, _mm_unpackhi_epi64, _mm_unpacklo_epi64,
     },
-    mem, slice,
+    cmp, mem, slice,
 };
 
 use crate::{bit_64::Bit64Simd, SimdCompare};
@@ -157,18 +157,12 @@ impl SimdCompare<i64, 8> for Avx2I64x2 {
 
     fn mask_storeu(input: Self, data: &mut [i64]) {
         unsafe {
-            if data.len() >= 8 {
-                _mm256_storeu_si256(mem::transmute(data.as_ptr()), input.values[0]);
-                _mm256_storeu_si256(mem::transmute(data[4..].as_ptr()), input.values[1]);
-            } else {
-                let mask = LOADU_MASK[data.len()];
-                let mask1 = _mm256_loadu_si256(mem::transmute(mask.as_ptr()));
-                let mask2 = _mm256_loadu_si256(mem::transmute(mask[4..].as_ptr()));
-                _mm256_maskstore_epi64(data.as_mut_ptr(), mask1, input.values[0]);
-                if data.len() > 4 {
-                    _mm256_maskstore_epi64(data[4..].as_mut_ptr(), mask2, input.values[1]);
-                }
-            }
+            let mask = LOADU_MASK[data.len()];
+            let mask1 = _mm256_loadu_si256(mem::transmute(mask.as_ptr()));
+            let mask2 = _mm256_loadu_si256(mem::transmute(mask[4..].as_ptr()));
+            _mm256_maskstore_epi64(data.as_mut_ptr(), mask1, input.values[0]);
+            let split_index = cmp::min(data.len(), 4);
+            _mm256_maskstore_epi64(data[split_index..].as_mut_ptr(), mask2, input.values[1]);
         }
     }
 
@@ -346,9 +340,9 @@ impl From<[i64; 8]> for Avx2I64x2 {
 impl From<&[i64]> for Avx2I64x2 {
     fn from(v: &[i64]) -> Self {
         unsafe {
-            let mask = LOADU_MASK[v.len()];
-            let mask1 = _mm256_loadu_si256(mem::transmute(mask.as_ptr()));
-            let mask2 = _mm256_loadu_si256(mem::transmute(mask[4..].as_ptr()));
+            let mask = LOADU_MASK[v.len()].as_ptr();
+            let mask1 = _mm256_loadu_si256(mem::transmute(mask));
+            let mask2 = _mm256_loadu_si256(mem::transmute(mask.offset(4)));
             let indices1 = _mm256_loadu_si256(mem::transmute(V_INDEX_1.as_ptr()));
             let indices2 = _mm256_loadu_si256(mem::transmute(V_INDEX_2.as_ptr()));
             let max_values = _mm256_broadcastq_epi64(_mm_set1_epi64x(i64::MAX));
