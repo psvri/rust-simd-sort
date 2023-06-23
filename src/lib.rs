@@ -1,4 +1,5 @@
 #![cfg_attr(feature = "nightly", feature(portable_simd))]
+#![cfg_attr(feature = "nightly", feature(stdsimd))]
 
 pub(crate) mod bit_64;
 pub mod platform;
