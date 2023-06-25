@@ -420,150 +420,57 @@ impl Bit64Simd<i64> for Avx2I64x2 {
 
 #[cfg(test)]
 mod test {
+    use crate::bit_64::test::*;
+    use std::fmt::Debug;
+    use std::ops::Not;
+
     use super::*;
 
-    #[test]
-    fn test_min_max() {
-        let first = Avx2I64x2::from([1, 20, 3, 40, 5, 60, 70, 80]);
-        let second = Avx2I64x2::from([10, 2, 30, 4, 50, 6, 7, 8]);
-        assert_eq!(
-            <Avx2I64x2 as SimdCompare<i64, 8>>::min(first, second),
-            Avx2I64x2::from([1, 2, 3, 4, 5, 6, 7, 8])
-        );
-        assert_eq!(
-            <Avx2I64x2 as SimdCompare<i64, 8>>::max(first, second),
-            Avx2I64x2::from([10, 20, 30, 40, 50, 60, 70, 80])
-        );
-    }
-
-    #[test]
-    fn test_loadu_storeu() {
-        let mut input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = Avx2I64x2::from(input_slice[..8].as_ref());
-        assert_eq!(first, Avx2I64x2::from([1, 2, 3, 4, 5, 6, 7, 8]));
-        Avx2I64x2::storeu(first, &mut input_slice[2..]);
-        assert_eq!(input_slice, [1i64, 2, 1, 2, 3, 4, 5, 6, 7, 8]);
-    }
-
-    #[test]
-    fn test_get_at_index() {
-        let first = Avx2I64x2::from([1, 2, 3, 4, 5, 6, 7, 8]);
-        for i in 1..9 {
-            assert_eq!(i as i64, Avx2I64x2::get_value_at_idx(first, i - 1));
+    fn into_array_i64(x: Avx2I64x2) -> [i64; 8] {
+        unsafe {
+            mem::transmute(x)
         }
     }
 
-    #[test]
-    fn test_ge() {
-        let first = Avx2I64x2::from([1, 20, 3, 40, 5, 60, 7, 80]);
-        let second = Avx2I64x2::from([10, 2, 30, 40, 50, 6, 70, 80]);
-        let result_mask = Avx2I64x2::ge(first, second);
-        assert_eq!(result_mask, Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, -1]));
-    }
-
-    #[test]
-    fn test_gather() {
-        let input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = Avx2I64x2::gather_from_idx([1, 1, 2, 2, 9, 9, 5, 6], input_slice.as_ref());
-        assert_eq!(first.as_slice(), [2, 2, 3, 3, 10, 10, 6, 7]);
-    }
-
-    #[test]
-    fn test_not() {
-        let first: Avx2I64x2 = Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, 0]);
-        assert_eq!(
-            Avx2I64x2::not_mask(first).as_slice(),
-            [-1, 0, -1, 0, -1, 0, -1, -1]
-        );
-    }
-
-    #[test]
-    fn test_reduce_min_max() {
-        let first = Avx2I64x2::from([5, 6, 3, 4, 1, 2, 9, 8]);
-        assert_eq!(Avx2I64x2::reducemin(first), 1);
-        assert_eq!(Avx2I64x2::reducemax(first), 9);
-    }
-
-    fn generate_mask_answer(bitmask: usize, values: &[i64]) -> ([i64; 8], [i64; 8]) {
-        let mut result = [0; 8];
-        let mut new_values = [0; 8];
+    fn generate_mask_answer<T, M>(bitmask: usize, values: &[T]) -> (M, [T; 8]) 
+    where
+        T: TryFrom<usize> + Default + Copy +Not<Output = T>,
+        <T as TryFrom<usize>>::Error: Debug,
+        M: From<[T;8]>
+    {
+        let mut result = [<T as Default>::default(); 8];
+        let mut new_values = [<T as Default>::default(); 8];
         let mut count = 0;
         for i in 0..8 {
             if bitmask & (1 << i) != 0 {
-                result[i] = -1;
+                result[i] = !<T as Default>::default();
                 new_values[count] = values[i];
                 count += 1;
             }
         }
-        (result, new_values)
+        (M::try_from(result).unwrap(), new_values)
     }
 
-    #[test]
-    fn test_compress_store_u() {
-        let input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = Avx2I64x2::from(&input_slice[..8]);
-        for i in 0..255 {
-            let (mask, new_values) = generate_mask_answer(dbg!(i), &input_slice);
-            let mask = Avx2I64x2::from(mask);
-            dbg!(format!("{:?}", mask));
-            let mut new_array = input_slice.clone();
-            Avx2I64x2::mask_compressstoreu(&mut new_array[2..], mask, first);
-            dbg!(format!("{:?}", new_array));
-            dbg!(format!("{:?}", new_values));
-            println!("{:?}", new_array);
-            for j in 0..i.count_ones() as usize {
-                assert_eq!(new_array[2 + j], new_values[j]);
-            }
-            for j in i..8 {
-                assert_eq!(new_array[2 + j], input_slice[2 + j]);
-            }
-        }
+    fn mask_fn(x: u8) -> Avx2I64x2 {
+        Avx2I64x2::from(LOADU_MASK[x.count_ones() as usize])
     }
 
-    #[test]
-    fn test_shuffle1_1_1_1() {
-        let first = Avx2I64x2::from([1i64, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(
-            Avx2I64x2::shuffle1_1_1_1(first).as_slice(),
-            [2, 1, 4, 3, 6, 5, 8, 7]
-        );
-    }
-
-    #[test]
-    fn test_count_ones() {
-        for i in 0..8 {
-            let mask = Avx2I64x2::from(LOADU_MASK[i]);
-            assert_eq!(Avx2I64x2::ones_count(mask), i);
-        }
-    }
-
-    #[test]
-    fn test_swizzle2_0xaa() {
-        let first = Avx2I64x2::from([1i64, 2, 3, 4, 5, 6, 7, 8]);
-        let second = Avx2I64x2::from([10i64, 20, 30, 40, 50, 60, 70, 80]);
-        assert_eq!(
-            Avx2I64x2::swizzle2_0xaa(first, second).as_slice(),
-            [1, 20, 3, 40, 5, 60, 7, 80]
-        );
-    }
-
-    #[test]
-    fn test_swizzle2_0xcc() {
-        let first = Avx2I64x2::from([1, 2, 3, 4, 5, 6, 7, 8]);
-        let second = Avx2I64x2::from([10, 20, 30, 40, 50, 60, 70, 80]);
-        assert_eq!(
-            Avx2I64x2::swizzle2_0xcc(first, second).as_slice(),
-            [1, 2, 30, 40, 5, 6, 70, 80]
-        );
-    }
-
-    #[test]
-    fn test_swizzle2_0xf0() {
-        let first = Avx2I64x2::from([1, 2, 3, 4, 5, 6, 7, 8]);
-        let second = Avx2I64x2::from([10, 20, 30, 40, 50, 60, 70, 80]);
-        assert_eq!(
-            Avx2I64x2::swizzle2_0xf0(first, second).as_slice(),
-            [1, 2, 3, 4, 50, 60, 70, 80]
-        );
-    }
+    test_min_max!(i64, Avx2I64x2, into_array_i64);
+    test_loadu_storeu!(i64, Avx2I64x2, into_array_i64);
+    test_mask_loadu_mask_storeu!(i64, Avx2I64x2, into_array_i64);
+    test_get_at_index!(i64, Avx2I64x2);
+    test_ge!(i64, Avx2I64x2, Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, -1]));
+    test_gather!(i64, Avx2I64x2, into_array_i64);
+    test_not!(i64, Avx2I64x2, Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, 0]), Avx2I64x2::from([-1, 0, -1, 0, -1, 0, -1, -1]));
+    test_count_ones!(i64, Avx2I64x2, mask_fn);
+    test_reduce_min_max!(i64, Avx2I64x2);
+    test_compress_store_u!(i64, Avx2I64x2, Avx2I64x2, generate_mask_answer);
+    test_shuffle1_1_1_1!(i64, Avx2I64x2, into_array_i64);
+    test_swizzle2_0xaa!(i64, Avx2I64x2, into_array_i64);
+    test_swizzle2_0xcc!(i64, Avx2I64x2, into_array_i64);
+    test_swizzle2_0xf0!(i64, Avx2I64x2, into_array_i64);
+    network64bit1!(i64, Avx2I64x2, into_array_i64);
+    network64bit2!(i64, Avx2I64x2, into_array_i64);
+    network64bit3!(i64, Avx2I64x2, into_array_i64);
+    network64bit4!(i64, Avx2I64x2, into_array_i64);
 }

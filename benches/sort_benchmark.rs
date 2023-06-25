@@ -99,6 +99,24 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
     }
 
+    #[cfg(all(target_feature = "simd128", target_arch = "wasm32"))]
+    {
+        use simd_sort::platform::wasm::wasm128_sort_i64;
+        let data_t = data.clone();
+        c.bench_function("wasm32", move |b| {
+            // This will avoid timing the to_vec call.
+            b.iter_batched(
+                || data_t.clone(),
+                |mut data| {
+                    wasm128_sort_i64(data.as_mut_slice());
+                    black_box(data);
+                },
+                BatchSize::LargeInput,
+            )
+        });
+    }
+
+
     #[cfg(feature = "nightly")]
     {
         use simd_sort::platform::nightly::portable_simd_sort_i64;

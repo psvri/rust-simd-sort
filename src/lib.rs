@@ -3,7 +3,7 @@
 
 pub(crate) mod bit_64;
 pub mod platform;
-pub(crate) mod utils;
+
 use std::{
     cmp::{max_by, min_by, Ordering},
     fmt::Debug,
@@ -69,6 +69,11 @@ impl SimdSortable for u64 {
 impl SimdSortable for i64 {
     const MAX_VALUE: Self = i64::MAX;
     const MIN_VALUE: Self = i64::MIN;
+}
+
+impl SimdSortable for f64 {
+    const MAX_VALUE: Self = f64::MAX;
+    const MIN_VALUE: Self = f64::MIN;
 }
 
 pub(crate) fn comparison_func<T: SimdSortable>(a: &T, b: &T) -> Ordering {

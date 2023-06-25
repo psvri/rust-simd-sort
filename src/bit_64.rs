@@ -2,31 +2,40 @@ use std::cmp;
 
 use crate::{cmp_merge, coex, partition_avx512_unrolled, SimdCompare, SimdSortable};
 
-pub(crate) trait Bit64Element: SimdSortable {}
+pub trait Bit64Element: SimdSortable {}
 
 impl Bit64Element for u64 {}
 
 impl Bit64Element for i64 {}
+impl Bit64Element for f64 {}
 
 pub(crate) trait Bit64Simd<T: Bit64Element> {
+    //ZMM 76543210
+    //    10101010 , 0 -> first, 1 -> second
     fn swizzle2_0xaa(a: Self, b: Self) -> Self;
+
+    //ZMM 76543210
+    //    11001100, 0 -> first, 1 -> second
     fn swizzle2_0xcc(a: Self, b: Self) -> Self;
+
+    //ZMM 76543210
+    //    11110000, 0 -> first, 1 -> second
     fn swizzle2_0xf0(a: Self, b: Self) -> Self;
 
     /// [1, 0, 3, 2, 5, 4, 7, 6]
     fn shuffle1_1_1_1(a: Self) -> Self;
 
-    //   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
-    /// #define NETWORK_64BIT_1 4, 5, 6, 7, 0, 1, 2, 3
+    ///   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
+    ///  #define NETWORK_64BIT_1 4, 5, 6, 7, 0, 1, 2, 3
     fn network64bit1(a: Self) -> Self;
-    //   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
-    /// #define NETWORK_64BIT_2 0, 1, 2, 3, 4, 5, 6, 7
+    ///   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
+    ///  #define NETWORK_64BIT_2 0, 1, 2, 3, 4, 5, 6, 7
     fn network64bit2(a: Self) -> Self;
-    //   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
-    /// #define NETWORK_64BIT_3 5, 4, 7, 6, 1, 0, 3, 2
+    ///   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
+    ///  #define NETWORK_64BIT_3 5, 4, 7, 6, 1, 0, 3, 2
     fn network64bit3(a: Self) -> Self;
-    //   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
-    /// #define NETWORK_64BIT_4 3, 2, 1, 0, 7, 6, 5, 4
+    ///   ZMM                    7, 6, 5, 4, 3, 2, 1, 0
+    ///  #define NETWORK_64BIT_4 3, 2, 1, 0, 7, 6, 5, 4
     fn network64bit4(a: Self) -> Self;
 }
 
@@ -1036,4 +1045,346 @@ where
     if pivot != biggest {
         qsort_64bit_::<T, U>(right, max_iters - 1);
     }
+}
+
+#[cfg(test)]
+pub(crate) mod test {
+    macro_rules! test_min_max {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_min_max_ $ty>]() {
+                    let first = $simd::loadu(&[1, 20, 3, 40, 5, 60, 70, 80]);
+                    let second = $simd::loadu(&[10, 2, 30, 4, 50, 6, 7, 8]);
+                    assert_eq!(
+                        $into_array(<$simd as SimdCompare<$ty, 8>>::min(first, second)),
+                        [1, 2, 3, 4, 5, 6, 7, 8]
+                    );
+                    assert_eq!(
+                        $into_array(<$simd as SimdCompare<$ty, 8>>::max(first, second)),
+                        [10, 20, 30, 40, 50, 60, 70, 80]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! test_loadu_storeu {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_loadu_storeu_ $ty>]() {
+                    let mut input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let first = $simd::loadu(input_slice.as_ref());
+                    assert_eq!($into_array(first), [1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    $simd::storeu(first, &mut input_slice[2..]);
+                    assert_eq!(input_slice, [1 as $ty, 2, 1, 2, 3, 4, 5, 6, 7, 8]);
+                }
+            }
+        };
+    }
+
+    macro_rules! test_mask_loadu_mask_storeu {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_mask_loadu_mask_storeu_ $ty>]() {
+                    let mut input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let first = $simd::mask_loadu(&input_slice[..2]);
+                    assert_eq!(
+                        $into_array(first),
+                        [
+                            1,
+                            2,
+                            $ty::MAX,
+                            $ty::MAX,
+                            $ty::MAX,
+                            $ty::MAX,
+                            $ty::MAX,
+                            $ty::MAX
+                        ]
+                    );
+                    $simd::mask_storeu(first, &mut input_slice[2..4]);
+                    assert_eq!(input_slice, [1 as $ty, 2, 1, 2, 5, 6, 7, 8, 9, 10]);
+                }
+            }
+        };
+    }
+
+    macro_rules! test_get_at_index {
+        ($ty: ident, $simd: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_get_at_index_ $ty>]() {
+                    let first = $simd::mask_loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    for i in 1..9 {
+                        assert_eq!(i as $ty, $simd::get_value_at_idx(first, i - 1));
+                    }
+                }
+            }
+        };
+    }
+
+    macro_rules! test_ge {
+        ($ty: ident, $simd: ident, $mask_result: expr) => {
+            paste::paste! {
+                #[test]
+                fn [<test_ge_ $ty>]() {
+                    let first = $simd::mask_loadu(&[1 as $ty, 20, 3, 40, 5, 60, 7, 80]);
+                    let second = $simd::mask_loadu(&[10 as $ty, 2, 30, 40, 50, 6, 70, 80]);
+                    let result_mask = <$simd as SimdCompare<$ty, 8>>::ge(first, second);
+                    assert_eq!(result_mask, $mask_result);
+                }
+            }
+        };
+    }
+
+    macro_rules! test_gather {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_gather_ $ty>]() {
+                    let input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let first = $simd::gather_from_idx([1, 1, 2, 2, 9, 9, 5, 6], input_slice.as_ref());
+                    assert_eq!($into_array(first), [2, 2, 3, 3, 10, 10, 6, 7]);
+                }
+            }
+        };
+    }
+
+    macro_rules! test_not {
+        ($ty: ident, $simd: ident, $mask_input: expr, $mask_result: expr) => {
+            paste::paste! {
+                #[test]
+                fn [<test_not_ $ty>]() {
+                    let first: <$simd as SimdCompare<$ty, 8>>::OPMask = $mask_input;
+                    assert_eq!($simd::not_mask(first), $mask_result);
+                }
+            }
+        };
+    }
+
+    macro_rules! test_count_ones {
+        ($ty: ident, $simd: ident, $mask_fn: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_count_ones_ $ty>]() {
+                    for i in 0u8..8 {
+                        let mask = $mask_fn(i);
+                        assert_eq!($simd::ones_count(mask), i.count_ones() as usize);
+                    }
+                }
+            }
+        };
+    }
+
+    macro_rules! test_reduce_min_max {
+        ($ty: ident, $simd: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_reduce_min_max_ $ty>]() {
+                    let first = $simd::mask_loadu(&[1 as $ty, 6, 3, 4, 1, 2, 9, 8]);
+                    assert_eq!($simd::reducemin(first), 1);
+                    assert_eq!($simd::reducemax(first), 9);
+                }
+            }
+        };
+    }
+
+    macro_rules! test_compress_store_u {
+        ($ty: ident, $simd: ident, $mask_ty: ident,$generate_fn: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_compress_store_u_ $ty>]() {
+                    let input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let first = $simd::loadu(input_slice.as_ref());
+                    for i in 0..255 {
+                        let (mask, new_values) = $generate_fn::<$ty, $mask_ty>(i, &input_slice);
+                        format!("{:?}", mask);
+                        let mut new_array = input_slice.clone();
+                        $simd::mask_compressstoreu(&mut new_array[2..], mask, first);
+                        format!("{:?}", new_array);
+                        format!("{:?}", new_values);
+                        println!("{:?}", new_array);
+                        for j in 0..i.count_ones() as usize {
+                            assert_eq!(new_array[2 + j], new_values[j]);
+                        }
+                        for j in i..8 {
+                            assert_eq!(new_array[2 + j], input_slice[2 + j]);
+                        }
+                    }
+                }
+            }
+        };
+    }
+
+    macro_rules! test_shuffle1_1_1_1 {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_shuffle1_1_1_1_ $ty>]() {
+                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    assert_eq!(
+                        $into_array($simd::shuffle1_1_1_1(first)),
+                        [2  as $ty, 1, 4, 3, 6, 5, 8, 7]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! test_swizzle2_0xaa {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_swizzle2_0xaa_ $ty>]() {
+                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    let second = $simd::loadu(&[10 as $ty, 20, 30, 40, 50, 60, 70, 80]);
+                    assert_eq!(
+                        $into_array($simd::swizzle2_0xaa(first, second)),
+                        [1, 20, 3, 40, 5, 60, 7, 80]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! test_swizzle2_0xcc {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_swizzle2_0xcc_ $ty>]() {
+                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    let second = $simd::loadu(&[10 as $ty, 20, 30, 40, 50, 60, 70, 80]);
+                    assert_eq!(
+                        $into_array($simd::swizzle2_0xcc(first, second)),
+                        [1, 2, 30, 40, 5, 6, 70, 80]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! test_swizzle2_0xf0 {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_swizzle2_0xf0_ $ty>]() {
+                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    let second = $simd::loadu(&[10 as $ty, 20, 30, 40, 50, 60, 70, 80]);
+                    assert_eq!(
+                        $into_array($simd::swizzle2_0xf0(first, second)),
+                        [1, 2, 3, 4, 50, 60, 70, 80]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! network64bit1 {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<network64bit1_ $ty>]() {
+                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    assert_eq!(
+                        $into_array($simd::network64bit1(first)),
+                        [3  as $ty, 2, 1, 0, 7, 6, 5, 4]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! network64bit2 {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<network64bit2_ $ty>]() {
+                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    assert_eq!(
+                        $into_array($simd::network64bit2(first)),
+                        [7  as $ty, 6, 5, 4, 3, 2, 1, 0]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! network64bit3 {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<network64bit3_ $ty>]() {
+                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    assert_eq!(
+                        $into_array($simd::network64bit3(first)),
+                        [2  as $ty, 3, 0, 1, 6, 7, 4, 5]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! network64bit4 {
+        ($ty: ident, $simd: ident, $into_array: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<network64bit4_ $ty>]() {
+                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    assert_eq!(
+                        $into_array($simd::network64bit4(first)),
+                        [4  as $ty, 5, 6, 7, 0, 1, 2, 3]
+                    );
+                }
+            }
+        };
+    }
+
+    macro_rules! test_sort_n {
+        ($ty: ident, $simd: ident, $n: literal) => {
+            paste::paste! {
+                #[test]
+                fn [<test_sort_ $n _ $ty >]() {
+                    let result: Vec<i64> = (0 as $ty..$n).into_iter().collect();
+                    for i in 0..$n {
+                        let mut array = Vec::with_capacity(i);
+                        array.extend_from_slice(&result[..i]);
+                        array.reverse();
+                        [<sort_ $n>]::<$ty, $simd>(&mut array);
+                        assert_eq!(&array, &result[..i]);
+                    }
+                }
+            }
+        };
+    }
+
+    macro_rules! test_sort_e2e {
+        ($ty: ident, $simd: ident, $sort: ident) => {
+            paste::paste! {
+                #[test]
+                fn [<test_sort_e2e_ $ty >]() {
+                    let start = 0;
+                    let end = 1024;
+                    let result: Vec<$ty> = (0 as $ty..end).into_iter().collect();
+                    for i in start as usize..end as usize {
+                        let mut array = Vec::with_capacity(i);
+                        array.extend_from_slice(&result[..i]);
+                        array.reverse();
+                        $sort(array.as_mut_slice());
+                        assert_eq!(&array, &result[..i]);
+                        println!("succeeded {}", i);
+                    }
+                }
+            }
+        };
+    }
+
+    pub(crate) use {
+        network64bit1, network64bit2, network64bit3, network64bit4, test_compress_store_u,
+        test_count_ones, test_gather, test_ge, test_get_at_index, test_loadu_storeu,
+        test_mask_loadu_mask_storeu, test_min_max, test_not, test_reduce_min_max,
+        test_shuffle1_1_1_1, test_sort_e2e, test_sort_n, test_swizzle2_0xaa, test_swizzle2_0xcc,
+        test_swizzle2_0xf0,
+    };
 }

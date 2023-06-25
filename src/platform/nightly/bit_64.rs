@@ -351,143 +351,96 @@ impl<T: Bit64Element> Bit64Simd<T> for Simd<T, 8> {
 
 #[cfg(test)]
 mod tests {
-    use std::simd::{i64x8, Swizzle};
-
-    use crate::bit_64::*;
+    use crate::bit_64::test::*;
+    use std::simd::*;
 
     use super::*;
 
-    #[test]
-    fn test_shuffle1_1_1_1() {
-        let data = i64x8::from([1, 2, 3, 4, 5, 6, 7, 8]);
-        let shuffled = i64x8::from([2, 1, 4, 3, 6, 5, 8, 7]);
-        assert_eq!(Shuffle1_1_1_1::swizzle(data), shuffled);
+    fn into_array_i64(x: i64x8) -> [i64; 8] {
+        x.into()
     }
 
-    #[test]
-    fn test_swizzle2_0xaa() {
-        let frist = i64x8::from([1, 2, 3, 4, 5, 6, 7, 8]);
-        let second = i64x8::from([10, 20, 30, 40, 50, 60, 70, 80]);
-        let shuffled = i64x8::from([1, 20, 3, 40, 5, 60, 7, 80]);
-        assert_eq!(Swizzle2_0xAA::swizzle2(frist, second), shuffled);
+    fn into_array_u64(x: u64x8) -> [u64; 8] {
+        x.into()
     }
 
-    #[test]
-    fn test_swizzle2_0xcc() {
-        let frist = i64x8::from([1, 2, 3, 4, 5, 6, 7, 8]);
-        let second = i64x8::from([10, 20, 30, 40, 50, 60, 70, 80]);
-        let shuffled = i64x8::from([1, 2, 30, 40, 5, 6, 70, 80]);
-        assert_eq!(Swizzle2_0xCC::swizzle2(frist, second), shuffled);
+    fn mask_fn<T: MaskElement>(x: u8) -> Mask<T, 8> {
+        Mask::<T, 8>::from_bitmask(x)
     }
 
-    #[test]
-    fn test_swizzle2_0xf0() {
-        let frist = u64x8::from([1, 2, 3, 4, 5, 6, 7, 8]);
-        let second = u64x8::from([10, 20, 30, 40, 50, 60, 70, 80]);
-        let shuffled = u64x8::from([1, 2, 3, 4, 50, 60, 70, 80]);
-        assert_eq!(Swizzle2_0xF0::swizzle2(frist, second), shuffled);
-    }
-
-    #[test]
-    fn test_min_max() {
-        let frist = u64x8::from([1, 20, 3, 40, 5, 60, 7, 80]);
-        let second = u64x8::from([10, 2, 30, 4, 50, 6, 70, 8]);
-        assert_eq!(
-            <u64x8 as SimdCompare<u64, 8>>::min(frist, second),
-            u64x8::from([1, 2, 3, 4, 5, 6, 7, 8])
-        );
-        assert_eq!(
-            <u64x8 as SimdCompare<u64, 8>>::max(frist, second),
-            u64x8::from([10, 20, 30, 40, 50, 60, 70, 80])
-        );
-    }
-
-    #[test]
-    fn test_sort_8() {
-        let result: Vec<u64> = (0u64..8).into_iter().collect();
+    fn generate_mask_answer<T, M>(bitmask: usize, values: &[T]) -> (M, [T; 8])
+    where
+        T: TryFrom<usize> + Default + Copy,
+        M: ToBitMask<BitMask = u8>,
+    {
+        let mut new_values = [<T as Default>::default(); 8];
+        let mut count = 0;
         for i in 0..8 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_8::<u64, u64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
+            if bitmask & (1 << i) != 0 {
+                new_values[count] = values[i];
+                count += 1;
+            }
         }
-
-        let result: Vec<i64> = (0i64..8).into_iter().collect();
-        for i in 0..8 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_8::<i64, i64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
-        }
+        (M::from_bitmask(bitmask as u8), new_values)
     }
 
-    #[test]
-    fn test_sort_16() {
-        let result: Vec<u64> = (0u64..16).into_iter().collect();
-        for i in 0..16 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_16::<u64, u64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
-        }
+    type I64Mask = Mask<i64, 8>;
 
-        let result: Vec<i64> = (0i64..16).into_iter().collect();
-        for i in 0..16 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_16::<i64, i64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
-        }
-    }
+    // test i64x8
+    test_min_max!(i64, i64x8, into_array_i64);
+    test_loadu_storeu!(i64, i64x8, into_array_i64);
+    test_mask_loadu_mask_storeu!(i64, i64x8, into_array_i64);
+    test_get_at_index!(i64, i64x8);
+    test_ge!(
+        i64,
+        i64x8,
+        Mask::from([false, true, false, true, false, true, false, true])
+    );
+    test_gather!(i64, i64x8, into_array_i64);
+    test_not!(
+        i64,
+        i64x8,
+        Mask::from([false, true, false, true, false, true, false, false]),
+        Mask::from([true, false, true, false, true, false, true, true])
+    );
+    test_count_ones!(i64, i64x8, mask_fn);
+    test_reduce_min_max!(i64, i64x8);
+    test_compress_store_u!(i64, i64x8, I64Mask, generate_mask_answer);
+    test_shuffle1_1_1_1!(i64, i64x8, into_array_i64);
+    test_swizzle2_0xaa!(i64, i64x8, into_array_i64);
+    test_swizzle2_0xcc!(i64, i64x8, into_array_i64);
+    test_swizzle2_0xf0!(i64, i64x8, into_array_i64);
+    network64bit1!(i64, i64x8, into_array_i64);
+    network64bit2!(i64, i64x8, into_array_i64);
+    network64bit3!(i64, i64x8, into_array_i64);
+    network64bit4!(i64, i64x8, into_array_i64);
 
-    #[test]
-    fn test_sort_32() {
-        let result: Vec<u64> = (0u64..32).into_iter().collect();
-        for i in 0..32 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_32::<u64, u64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
-        }
-
-        let result: Vec<i64> = (0i64..32).into_iter().collect();
-        for i in 0..32 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_32::<i64, i64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
-        }
-    }
-
-    #[test]
-    fn test_sort_64() {
-        let result: Vec<u64> = (0u64..64).into_iter().collect();
-        for i in 0..64 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_64::<u64, u64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
-            println!("succeeded {}", i);
-        }
-    }
-
-    #[test]
-    fn test_sort_128() {
-        let result: Vec<u64> = (0u64..128).into_iter().collect();
-        for i in 0..128 {
-            let mut array = Vec::with_capacity(i);
-            array.extend_from_slice(&result[..i]);
-            array.reverse();
-            sort_128::<u64, u64x8>(&mut array);
-            assert_eq!(&array, &result[..i]);
-            println!("succeeded {}", i);
-        }
-    }
+    // test u64x8
+    test_min_max!(u64, u64x8, into_array_u64);
+    test_loadu_storeu!(u64, u64x8, into_array_u64);
+    test_mask_loadu_mask_storeu!(u64, u64x8, into_array_u64);
+    test_get_at_index!(u64, u64x8);
+    test_ge!(
+        u64,
+        u64x8,
+        Mask::from([false, true, false, true, false, true, false, true])
+    );
+    test_gather!(u64, u64x8, into_array_u64);
+    test_not!(
+        u64,
+        u64x8,
+        Mask::from([false, true, false, true, false, true, false, false]),
+        Mask::from([true, false, true, false, true, false, true, true])
+    );
+    test_count_ones!(u64, u64x8, mask_fn);
+    test_reduce_min_max!(u64, u64x8);
+    test_compress_store_u!(u64, u64x8, I64Mask, generate_mask_answer);
+    test_shuffle1_1_1_1!(u64, u64x8, into_array_u64);
+    test_swizzle2_0xaa!(u64, u64x8, into_array_u64);
+    test_swizzle2_0xcc!(u64, u64x8, into_array_u64);
+    test_swizzle2_0xf0!(u64, u64x8, into_array_u64);
+    network64bit1!(u64, u64x8, into_array_u64);
+    network64bit2!(u64, u64x8, into_array_u64);
+    network64bit3!(u64, u64x8, into_array_u64);
+    network64bit4!(u64, u64x8, into_array_u64);
 }
