@@ -1,0 +1,3 @@
+[submodule "other_implementations/vqsort"]
+	path = other_implementations/vqsort
+	url = https://github.com/google/highway.git
