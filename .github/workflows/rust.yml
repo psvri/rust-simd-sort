@@ -12,8 +12,6 @@ env:
 jobs:
   test_stable:
     name: Test Stable
-    env:
-        Greeting: Hello
     strategy:
         matrix:
           os: [windows-latest, ubuntu-latest, macos-latest]
@@ -54,8 +52,6 @@ jobs:
 
   test_nightly:
     name: Test Nightly
-    env:
-        Greeting: Hello
     strategy:
         matrix:
           os: [windows-latest, ubuntu-latest, macos-latest]
@@ -92,5 +88,43 @@ jobs:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
     - name: Test native
       run: cargo test --verbose --no-default-features --features="nightly"
+      env:
+        RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
+
+  bench:
+    name: Bench
+    needs: [test_nightly, test_stable]
+    strategy:
+        matrix:
+          os: [ubuntu-latest]
+          include:
+            - os: ubuntu-latest
+              native_target: x86-64-v3
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: true
+    - name: Set up cargo cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-bench
+    - name: Setup
+      run: |
+        rustc --print cfg -C target-cpu=native
+        rustup default nightly
+    - name: Bench
+      run: |
+        alias clang++-15="clang++-14"
+        cargo bench --verbose --no-default-features --features="rust_std_unstable,nightly,cpp_vqsort_avx2"
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
