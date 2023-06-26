@@ -17,6 +17,13 @@ jobs:
     strategy:
         matrix:
           os: [windows-latest, ubuntu-latest, macos-latest]
+          include:
+            - os: windows-latest
+              native_target: x86-64-v4
+            - os: ubuntu-latest
+              native_target: x86-64-v4
+            - os: macos-latest
+              native_target: x86-64
     runs-on: ${{ matrix.os }}
     continue-on-error: true
     steps:
@@ -37,14 +44,15 @@ jobs:
       run: |
         rustup target add wasm32-wasi
         cargo install cargo-wasi
+        cargo install wasmtime
     - name: Build native
       run: cargo build --verbose --no-default-features
       env:
-        RUSTFLAGS: -C target-cpu=x86-64-v3
+        RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
     - name: Test native
-      run: RUSTFLAGS="-C target-cpu=x86-64-v3" cargo test --verbose --no-default-features
+      run: cargo test --verbose --no-default-features
       env:
-        RUSTFLAGS: -C target-cpu=x86-64-v3
+        RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
     - name: Build wasm
       run: cargo wasi build --verbose --no-default-features
       env:
