@@ -19,9 +19,9 @@ jobs:
           os: [windows-latest, ubuntu-latest, macos-latest]
           include:
             - os: windows-latest
-              native_target: x86-64-v4
+              native_target: x86-64-v3
             - os: ubuntu-latest
-              native_target: x86-64-v4
+              native_target: x86-64-v3
             - os: macos-latest
               native_target: x86-64
     runs-on: ${{ matrix.os }}
