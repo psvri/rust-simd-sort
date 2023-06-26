@@ -87,10 +87,10 @@ jobs:
         rustc --print cfg -C target-cpu=native
         rustup default nightly
     - name: Build native
-      run: cargo build --verbose --no-default-features
+      run: cargo build --verbose --no-default-features --features="nightly"
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
     - name: Test native
-      run: cargo test --verbose --no-default-features
+      run: cargo test --verbose --no-default-features --features="nightly"
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
