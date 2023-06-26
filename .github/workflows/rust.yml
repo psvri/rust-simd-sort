@@ -124,7 +124,9 @@ jobs:
         rustup default nightly
     - name: Bench
       run: |
-        alias clang++-15="clang++-14"
+        rc=/tmp/rcfile
+        echo 'alias clang++-15="clang++-14"' >> $rc
+        source /tmp/rcfile
         cargo bench --verbose --no-default-features --features="rust_std_unstable,nightly,cpp_vqsort_avx2"
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
