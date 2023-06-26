@@ -2,7 +2,9 @@
 
 use std::{env, path::PathBuf};
 
-static CLANG_PATH: &'static str = "clang++-14";
+//choose which ever you like
+//static CLANG_PATH: &'static str = "clang++-12";
+static CLANG_PATH: &'static str = "g++-10";
 
 fn get_manifest_dir_path() -> PathBuf {
     PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
@@ -100,13 +102,31 @@ fn build_and_link_cpp_vqsort_avx2() {
     );
 }
 
+#[cfg(all(feature = "cpp_avx512_qsort", target_arch = "x86_64"))]
+fn build_and_link_cpp_avx512_qsort() {
+    build_and_link_cpp_sort(
+        "cpp_avx512_qsort",
+        Some(|builder: &mut cc::Build| {
+            builder.flag("-march=native");
+            builder
+                .include(get_manifest_dir_path().join("other_implementations/x86-simd-sort/src"));
+            builder.compiler(CLANG_PATH);
+            None
+        }),
+    );
+}
+
 #[cfg(not(feature = "cpp_vqsort"))]
 fn build_and_link_cpp_vqsort() {}
 
 #[cfg(not(feature = "cpp_vqsort_avx2"))]
 fn build_and_link_cpp_vqsort_avx2() {}
 
+#[cfg(not(feature = "cpp_avx512_qsort"))]
+fn build_and_link_cpp_avx512_qsort() {}
+
 fn main() {
     build_and_link_cpp_vqsort();
     build_and_link_cpp_vqsort_avx2();
+    build_and_link_cpp_avx512_qsort();
 }
