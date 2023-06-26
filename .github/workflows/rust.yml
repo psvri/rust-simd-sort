@@ -1,0 +1,55 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test_stable:
+    name: Test Stable
+    env:
+        Greeting: Hello
+    strategy:
+        matrix:
+          os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up cargo cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    - name: Setup
+      run: |
+        rustup target add wasm32-wasi
+        cargo install cargo-wasi
+    - name: Build native
+      run: cargo build --verbose --no-default-features
+      env:
+        RUSTFLAGS: -C target-cpu=x86-64-v3
+    - name: Test native
+      run: RUSTFLAGS="-C target-cpu=x86-64-v3" cargo test --verbose --no-default-features
+      env:
+        RUSTFLAGS: -C target-cpu=x86-64-v3
+    - name: Build wasm
+      run: cargo wasi build --verbose --no-default-features
+      env:
+        RUSTFLAGS: -C target-feature=+simd128
+    - name: Test wasm
+      run: cargo wasi test --verbose --no-default-features
+      env:
+        RUSTFLAGS: -C target-feature=+simd128
