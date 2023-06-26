@@ -2,7 +2,7 @@
 
 use std::{env, path::PathBuf};
 
-static CLANG_PATH: &'static str = "clang++-15";
+static CLANG_PATH: &'static str = "clang++-14";
 
 fn get_manifest_dir_path() -> PathBuf {
     PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap())
