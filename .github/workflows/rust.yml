@@ -37,12 +37,55 @@ jobs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           target/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}
+        key: ${{ runner.os }}-cargo-stable-${{ hashFiles('**/Cargo.toml') }}
         restore-keys: |
           ${{ runner.os }}-cargo-
     - name: Setup
       run: |
         rustc --print cfg -C target-cpu=native
+    - name: Build native
+      run: cargo build --verbose --no-default-features
+      env:
+        RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
+    - name: Test native
+      run: cargo test --verbose --no-default-features
+      env:
+        RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
+
+  test_nightly:
+    name: Test Nightly
+    env:
+        Greeting: Hello
+    strategy:
+        matrix:
+          os: [windows-latest, ubuntu-latest, macos-latest]
+          include:
+            - os: windows-latest
+              native_target: x86-64-v3
+            - os: ubuntu-latest
+              native_target: x86-64-v3
+            - os: macos-latest
+              native_target: x86-64
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up cargo cache
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          target/
+        key: ${{ runner.os }}-cargo-nightly-${{ hashFiles('**/Cargo.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    - name: Setup
+      run: |
+        rustc --print cfg -C target-cpu=native
+        rustup default nightly
     - name: Build native
       run: cargo build --verbose --no-default-features
       env:
