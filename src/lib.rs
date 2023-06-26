@@ -56,7 +56,7 @@ pub trait SimdSortable: PartialOrd + SimdElement + std::fmt::Debug {
 }
 
 #[cfg(not(feature = "nightly"))]
-pub trait SimdSortable: PartialOrd {
+pub trait SimdSortable: PartialOrd + Copy {
     const MAX_VALUE: Self;
     const MIN_VALUE: Self;
 }
