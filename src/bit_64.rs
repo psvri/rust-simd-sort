@@ -1209,7 +1209,7 @@ pub(crate) mod test {
                         for j in 0..i.count_ones() as usize {
                             assert_eq!(new_array[2 + j], new_values[j]);
                         }
-                        for j in i..8 {
+                        for j in i as usize..8 {
                             assert_eq!(new_array[2 + j], input_slice[2 + j]);
                         }
                     }

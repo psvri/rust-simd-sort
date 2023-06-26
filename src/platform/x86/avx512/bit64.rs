@@ -137,13 +137,12 @@ impl Bit64Simd<i64> for __m512i {
 
 #[cfg(test)]
 mod test {
+    use crate::bit_64::test::*;
+    use std::ops::*;
+
     use super::*;
 
-    fn from_array_for_m512(data: [i64; 8]) -> __m512i {
-        unsafe { _mm512_loadu_si512(mem::transmute(data.as_ptr())) }
-    }
-
-    fn into_array_for_m512(x: __m512i) -> [i64; 8] {
+    fn into_array_i64(x: __m512i) -> [i64; 8] {
         unsafe {
             slice::from_raw_parts(mem::transmute(&x), 8)
                 .try_into()
@@ -151,88 +150,13 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_min_max() {
-        let first = from_array_for_m512([1, 20, 3, 40, 5, 60, 70, 80]);
-        let second = from_array_for_m512([10, 2, 30, 4, 50, 6, 7, 8]);
-        assert_eq!(
-            into_array_for_m512(<__m512i as SimdCompare<i64, 8>>::min(first, second)),
-            [1, 2, 3, 4, 5, 6, 7, 8]
-        );
-        assert_eq!(
-            into_array_for_m512(<__m512i as SimdCompare<i64, 8>>::max(first, second)),
-            [10, 20, 30, 40, 50, 60, 70, 80]
-        );
-    }
-
-    #[test]
-    fn test_loadu_storeu() {
-        let mut input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = __m512i::loadu(input_slice.as_ref());
-        assert_eq!(into_array_for_m512(first), [1, 2, 3, 4, 5, 6, 7, 8]);
-        __m512i::storeu(first, &mut input_slice[2..]);
-        assert_eq!(input_slice, [1i64, 2, 1, 2, 3, 4, 5, 6, 7, 8]);
-    }
-
-    #[test]
-    fn test_mask_loadu_mask_storeu() {
-        let mut input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = __m512i::mask_loadu(&input_slice[..2]);
-        assert_eq!(
-            into_array_for_m512(first),
-            [
-                1,
-                2,
-                i64::MAX,
-                i64::MAX,
-                i64::MAX,
-                i64::MAX,
-                i64::MAX,
-                i64::MAX
-            ]
-        );
-        __m512i::mask_storeu(first, &mut input_slice[2..4]);
-        assert_eq!(input_slice, [1i64, 2, 1, 2, 5, 6, 7, 8, 9, 10]);
-    }
-
-    #[test]
-    fn test_get_at_index() {
-        let first = from_array_for_m512([1, 2, 3, 4, 5, 6, 7, 8]);
-        for i in 1..9 {
-            assert_eq!(i as i64, __m512i::get_value_at_idx(first, i - 1));
-        }
-    }
-
-    #[test]
-    fn test_ge() {
-        let first = from_array_for_m512([1, 20, 3, 40, 5, 60, 7, 80]);
-        let second = from_array_for_m512([10, 2, 30, 40, 50, 6, 70, 80]);
-        let result_mask = __m512i::ge(first, second);
-        assert_eq!(result_mask, 0b10101010);
-    }
-
-    #[test]
-    fn test_gather() {
-        let input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = __m512i::gather_from_idx([1, 1, 2, 2, 9, 9, 5, 6], input_slice.as_ref());
-        assert_eq!(into_array_for_m512(first), [2, 2, 3, 3, 10, 10, 6, 7]);
-    }
-
-    #[test]
-    fn test_not() {
-        let first: __mmask8 = 10;
-        assert_eq!(__m512i::not_mask(first), !first);
-    }
-
-    #[test]
-    fn test_reduce_min_max() {
-        let first = from_array_for_m512([5, 6, 3, 4, 1, 2, 9, 8]);
-        assert_eq!(__m512i::reducemin(first), 1);
-        assert_eq!(__m512i::reducemax(first), 9);
-    }
-
-    fn generate_mask_answer(bitmask: usize, values: &[i64]) -> [i64; 8] {
-        let mut new_values = [0; 8];
+    fn generate_mask_answer<T, M>(bitmask: M, values: &[T]) -> (M, [T; 8])
+    where
+        T: TryFrom<usize> + Default + Copy,
+        M: BitAnd<u8> + std::marker::Copy,
+        <M as BitAnd<u8>>::Output: PartialEq<u8>,
+    {
+        let mut new_values = [<T as Default>::default(); 8];
         let mut count = 0;
         for i in 0..8 {
             if bitmask & (1 << i) != 0 {
@@ -240,75 +164,29 @@ mod test {
                 count += 1;
             }
         }
-        new_values
+        (bitmask, new_values)
     }
 
-    #[test]
-    fn test_compress_store_u() {
-        let input_slice = [1i64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let first = __m512i::loadu(input_slice.as_ref());
-        for i in 0..255 {
-            let new_values = generate_mask_answer(dbg!(i), &input_slice);
-            let mask = i;
-            dbg!(format!("{:?}", mask));
-            let mut new_array = input_slice.clone();
-            __m512i::mask_compressstoreu(&mut new_array[2..], mask as u8, first);
-            dbg!(format!("{:?}", new_array));
-            dbg!(format!("{:?}", new_values));
-            println!("{:?}", new_array);
-            for j in 0..i.count_ones() as usize {
-                assert_eq!(new_array[2 + j], new_values[j]);
-            }
-            for j in i..8 {
-                assert_eq!(new_array[2 + j], input_slice[2 + j]);
-            }
-        }
+    fn mask_fn(x: u8) -> u8 {
+        x
     }
 
-    #[test]
-    fn test_shuffle1_1_1_1() {
-        let first = from_array_for_m512([1i64, 2, 3, 4, 5, 6, 7, 8]);
-        assert_eq!(
-            into_array_for_m512(__m512i::shuffle1_1_1_1(first)),
-            [2, 1, 4, 3, 6, 5, 8, 7]
-        );
-    }
-
-    #[test]
-    fn test_count_ones() {
-        for i in 0u8..8 {
-            let mask = i as <std::arch::x86_64::__m512i as SimdCompare<i64, 8>>::OPMask;
-            assert_eq!(__m512i::ones_count(mask), i.count_ones() as usize);
-        }
-    }
-
-    #[test]
-    fn test_swizzle2_0xaa() {
-        let first = from_array_for_m512([1i64, 2, 3, 4, 5, 6, 7, 8]);
-        let second = from_array_for_m512([10i64, 20, 30, 40, 50, 60, 70, 80]);
-        assert_eq!(
-            into_array_for_m512(__m512i::swizzle2_0xaa(first, second)),
-            [1, 20, 3, 40, 5, 60, 7, 80]
-        );
-    }
-
-    #[test]
-    fn test_swizzle2_0xcc() {
-        let first = from_array_for_m512([1, 2, 3, 4, 5, 6, 7, 8]);
-        let second = from_array_for_m512([10, 20, 30, 40, 50, 60, 70, 80]);
-        assert_eq!(
-            into_array_for_m512(__m512i::swizzle2_0xcc(first, second)),
-            [1, 2, 30, 40, 5, 6, 70, 80]
-        );
-    }
-
-    #[test]
-    fn test_swizzle2_0xf0() {
-        let first = from_array_for_m512([1, 2, 3, 4, 5, 6, 7, 8]);
-        let second = from_array_for_m512([10, 20, 30, 40, 50, 60, 70, 80]);
-        assert_eq!(
-            into_array_for_m512(__m512i::swizzle2_0xf0(first, second)),
-            [1, 2, 3, 4, 50, 60, 70, 80]
-        );
-    }
+    test_min_max!(i64, __m512i, into_array_i64);
+    test_loadu_storeu!(i64, __m512i, into_array_i64);
+    test_mask_loadu_mask_storeu!(i64, __m512i, into_array_i64);
+    test_get_at_index!(i64, __m512i);
+    test_ge!(i64, __m512i, 0b10101010);
+    test_gather!(i64, __m512i, into_array_i64);
+    test_not!(i64, __m512i, 0b10101010, !0b10101010);
+    test_count_ones!(i64, __m512i, mask_fn);
+    test_reduce_min_max!(i64, __m512i);
+    test_compress_store_u!(i64, __m512i, u8, generate_mask_answer);
+    test_shuffle1_1_1_1!(i64, __m512i, into_array_i64);
+    test_swizzle2_0xaa!(i64, __m512i, into_array_i64);
+    test_swizzle2_0xcc!(i64, __m512i, into_array_i64);
+    test_swizzle2_0xf0!(i64, __m512i, into_array_i64);
+    network64bit1!(i64, __m512i, into_array_i64);
+    network64bit2!(i64, __m512i, into_array_i64);
+    network64bit3!(i64, __m512i, into_array_i64);
+    network64bit4!(i64, __m512i, into_array_i64);
 }

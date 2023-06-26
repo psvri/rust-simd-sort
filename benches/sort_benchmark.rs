@@ -82,6 +82,32 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
     }
 
+    #[cfg(all(feature = "cpp_avx512_qsort",  target_arch = "x86_64"))]
+    {
+        extern "C" {
+            fn avx512_qsort_i64(data: *mut i64, size: usize);
+        }
+        unsafe {
+            let mut temp1 = data.clone();
+            let mut temp2 = data.clone();
+            avx512_qsort_i64(temp1.as_mut_ptr(), temp1.len());
+            temp2.sort();
+            assert_eq!(temp1, temp2);
+            let data_t = data.clone();
+            c.bench_function("cpp_avx512_qsort", move |b| {
+                // This will avoid timing the to_vec call.
+                b.iter_batched(
+                    || data_t.clone(),
+                    |mut data| {
+                        avx512_qsort_i64(data.as_mut_ptr(), data.len());
+                        black_box(data);
+                    },
+                    BatchSize::LargeInput,
+                )
+            });
+        }
+    }
+
     #[cfg(all(target_feature = "avx512f", target_arch = "x86_64"))]
     {
         use simd_sort::platform::x86::avx512::avx512_sort_i64;
