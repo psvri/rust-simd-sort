@@ -9,6 +9,7 @@ pub fn avx512_sort_i64(data: &mut [i64]) {
 }
 
 #[cfg(test)]
+#[cfg(target_feature="avx512f")]
 mod test {
     use crate::bit_64::{test::*, *};
 

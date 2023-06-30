@@ -1,6 +1,6 @@
 [submodule "other_implementations/vqsort"]
-	path = other_implementations/vqsort
+	path = benchmarks/other_implementations/vqsort
 	url = https://github.com/google/highway.git
 [submodule "other_implementations/x86-simd-sort"]
-	path = other_implementations/x86-simd-sort
+	path = benchmarks/other_implementations/x86-simd-sort
 	url = https://github.com/intel/x86-simd-sort.git

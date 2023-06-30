@@ -42,11 +42,11 @@ jobs:
       run: |
         rustc --print cfg -C target-cpu=native
     - name: Build native
-      run: cargo build --verbose --no-default-features
+      run: cargo build -p simd-sort --verbose
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
     - name: Test native
-      run: cargo test --verbose --no-default-features
+      run: cargo test -p simd-sort --verbose
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
 
@@ -83,11 +83,11 @@ jobs:
         rustc --print cfg -C target-cpu=native
         rustup default nightly
     - name: Build native
-      run: cargo build --verbose --no-default-features --features="nightly"
+      run: cargo build -p simd-sort --verbose --features=nightly
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
     - name: Test native
-      run: cargo test --verbose --no-default-features --features="nightly"
+      run: cargo test -p simd-sort --verbose --features=nightly
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
 
@@ -124,6 +124,7 @@ jobs:
         rustup default nightly
     - name: Bench
       run: |
+        cd benchmarks
         cargo bench --verbose --no-default-features --features="rust_std_unstable,nightly,cpp_vqsort_avx2"
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
