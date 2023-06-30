@@ -108,7 +108,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         }
     }
 
-    #[cfg(all(target_feature = "avx512f", target_arch = "x86_64"))]
+    #[cfg(all(target_feature = "avx512f", target_arch = "x86_64", feature="nightly"))]
     {
         use simd_sort::platform::x86::avx512::avx512_sort_i64;
         let data_t = data.clone();

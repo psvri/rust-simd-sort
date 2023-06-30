@@ -19,7 +19,7 @@ pub fn sort_i64(data: &mut [i64]) {
 
     #[cfg(all(target_arch = "x86_64", feature = "nightly"))]
     {
-        if cfg!(feature = "avx512f") {
+        if cfg!(target_feature = "avx512f") {
             x86::avx512::avx512_sort_i64(data)
         }
         if cfg!(feature = "avx2") {
