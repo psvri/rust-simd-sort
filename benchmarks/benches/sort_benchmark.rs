@@ -142,6 +142,21 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
     }
 
+    {
+        use simd_sort::platform::sort_i64;
+        let data_t = data.clone();
+        c.bench_function("best_runtime", move |b| {
+            // This will avoid timing the to_vec call.
+            b.iter_batched(
+                || data_t.clone(),
+                |mut data| {
+                    sort_i64(data.as_mut_slice());
+                    black_box(data);
+                },
+                BatchSize::LargeInput,
+            )
+        });
+    }
 
     #[cfg(feature = "nightly")]
     {

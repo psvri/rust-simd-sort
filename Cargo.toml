@@ -1,40 +1,9 @@
-[package]
-name = "simd-sort"
-version = "0.1.0"
-edition = "2021"
-
-[package.metadata]
-wasm-opt = false
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-
-
-[features]
-default = ["nightly", "rust_std_unstable"]
-nightly = []
-rust_std_unstable = []
-cpp_vqsort = []
-cpp_vqsort_avx2 = []
-cpp_avx512_qsort = []
-
-[build-dependencies]
-cc = { version = "1.0"}
-
-[dev-dependencies]
-rand = "0.8.5"
-paste = "1.0.12"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-criterion = "0.4.0"
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-criterion = {version = "0.4.0", default_features=false}
+[workspace]
+resolver = "2"
+members = [
+    "simd_sort",
+    "benchmarks",
+]
 
 [profile.bench]
 lto = "thin"
-
-[[bench]]
-name = "sort_benchmark"
-harness = false
