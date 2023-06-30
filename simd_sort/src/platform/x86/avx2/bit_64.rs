@@ -419,6 +419,7 @@ impl Bit64Simd<i64> for Avx2I64x2 {
 }
 
 #[cfg(test)]
+#[cfg(target_feature="avx2")]
 mod test {
     use crate::bit_64::test::*;
     use std::fmt::Debug;
