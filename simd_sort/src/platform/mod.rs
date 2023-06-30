@@ -10,7 +10,7 @@ pub mod wasm;
 pub fn sort_i64(data: &mut [i64]) {
     #[cfg(all(target_arch = "x86_64", not(feature = "nightly")))]
     {
-        if cfg!(feature = "avx2") {
+        if cfg!(target_feature = "avx2") {
             x86::avx2::avx2_sort_i64(data)
         } else {
             data.sort_unstable()
@@ -22,7 +22,7 @@ pub fn sort_i64(data: &mut [i64]) {
         if cfg!(target_feature = "avx512f") {
             x86::avx512::avx512_sort_i64(data)
         }
-        if cfg!(feature = "avx2") {
+        if cfg!(target_feature = "avx2") {
             x86::avx2::avx2_sort_i64(data)
         } else {
             data.sort_unstable()
