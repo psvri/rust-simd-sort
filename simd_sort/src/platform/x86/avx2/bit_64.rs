@@ -1,6 +1,6 @@
 use std::{
     arch::x86_64::{
-        __m256i, _mm256_blendv_pd, _mm256_broadcastq_epi64, _mm256_castpd_si256,
+        __m256i, _mm256_and_si256, _mm256_blendv_pd, _mm256_broadcastq_epi64, _mm256_castpd_si256,
         _mm256_castsi256_pd, _mm256_cmpeq_epi64, _mm256_cmpgt_epi64, _mm256_extracti128_si256,
         _mm256_i64gather_epi64, _mm256_loadu_si256, _mm256_mask_i64gather_epi64,
         _mm256_maskstore_epi64, _mm256_movemask_pd, _mm256_permute4x64_epi64,
@@ -418,8 +418,29 @@ impl Bit64Simd<i64> for Avx2I64x2 {
     }
 }
 
+pub fn compress_store_i64(input: &[i64], output: &mut [i64], mask: u8) {
+    unsafe {
+        if mask != 0 {
+            let expanded_mask = Avx2I64x2::set(mask as i64);
+            let and_mask = Avx2I64x2::loadu(&[
+                0b1, 0b10, 0b100, 0b1000, 0b1_0000, 0b10_0000, 0b100_0000, 0b1000_0000,
+            ]);
+            let p1 = _mm256_and_si256(expanded_mask.values[0], and_mask.values[0]);
+            let p2 = _mm256_and_si256(expanded_mask.values[1], and_mask.values[1]);
+            let mask = Avx2I64x2 {
+                values: [
+                    _mm256_cmpeq_epi64(p1, and_mask.values[0]),
+                    _mm256_cmpeq_epi64(p2, and_mask.values[1]),
+                ],
+            };
+            let len = cmp::min(input.len(), 8);
+            Avx2I64x2::mask_compressstoreu(output, mask, Avx2I64x2::mask_loadu(&input[..len]));
+        }
+    }
+}
+
 #[cfg(test)]
-#[cfg(target_feature="avx2")]
+#[cfg(target_feature = "avx2")]
 mod test {
     use crate::bit_64::test::*;
     use std::fmt::Debug;
@@ -428,16 +449,14 @@ mod test {
     use super::*;
 
     fn into_array_i64(x: Avx2I64x2) -> [i64; 8] {
-        unsafe {
-            mem::transmute(x)
-        }
+        unsafe { mem::transmute(x) }
     }
 
-    fn generate_mask_answer<T, M>(bitmask: usize, values: &[T]) -> (M, [T; 8]) 
+    fn generate_mask_answer<T, M>(bitmask: usize, values: &[T]) -> (M, [T; 8])
     where
-        T: TryFrom<usize> + Default + Copy +Not<Output = T>,
+        T: TryFrom<usize> + Default + Copy + Not<Output = T>,
         <T as TryFrom<usize>>::Error: Debug,
-        M: From<[T;8]>
+        M: From<[T; 8]>,
     {
         let mut result = [<T as Default>::default(); 8];
         let mut new_values = [<T as Default>::default(); 8];
@@ -460,9 +479,18 @@ mod test {
     test_loadu_storeu!(i64, Avx2I64x2, into_array_i64);
     test_mask_loadu_mask_storeu!(i64, Avx2I64x2, into_array_i64);
     test_get_at_index!(i64, Avx2I64x2);
-    test_ge!(i64, Avx2I64x2, Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, -1]));
+    test_ge!(
+        i64,
+        Avx2I64x2,
+        Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, -1])
+    );
     test_gather!(i64, Avx2I64x2, into_array_i64);
-    test_not!(i64, Avx2I64x2, Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, 0]), Avx2I64x2::from([-1, 0, -1, 0, -1, 0, -1, -1]));
+    test_not!(
+        i64,
+        Avx2I64x2,
+        Avx2I64x2::from([0, -1, 0, -1, 0, -1, 0, 0]),
+        Avx2I64x2::from([-1, 0, -1, 0, -1, 0, -1, -1])
+    );
     test_count_ones!(i64, Avx2I64x2, mask_fn);
     test_reduce_min_max!(i64, Avx2I64x2);
     test_compress_store_u!(i64, Avx2I64x2, Avx2I64x2, generate_mask_answer);
@@ -474,4 +502,13 @@ mod test {
     network64bit2!(i64, Avx2I64x2, into_array_i64);
     network64bit3!(i64, Avx2I64x2, into_array_i64);
     network64bit4!(i64, Avx2I64x2, into_array_i64);
+
+    #[test]
+    fn test_compress_store_i64() {
+        let mut data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let mask = 0b0001010u8;
+        let input = data.clone();
+        compress_store_i64(&input, &mut data, mask);
+        assert_eq!(data, [2, 4, 3, 4, 5, 6, 7, 8, 9, 10]);
+    }
 }

@@ -4,12 +4,14 @@ use self::bit_64::Avx2I64x2;
 
 pub mod bit_64;
 
+pub use bit_64::compress_store_i64 as avx2_compress_store_i64;
+
 pub fn avx2_sort_i64(data: &mut [i64]) {
     qsort_64bit_::<i64, Avx2I64x2>(data, f64::log2(data.len() as f64) as i64)
 }
 
 #[cfg(test)]
-#[cfg(target_feature="avx2")]
+#[cfg(target_feature = "avx2")]
 mod test {
     use crate::bit_64::{test::*, *};
 
