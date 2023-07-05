@@ -103,8 +103,9 @@ impl SimdCompare<i64, 8> for Avx2I64x2 {
     #[inline]
     fn loadu(data: &[i64]) -> Self {
         unsafe {
-            let v1 = _mm256_loadu_si256(mem::transmute(data.as_ptr()));
-            let v2 = _mm256_loadu_si256(mem::transmute(data[4..].as_ptr()));
+            let base_ptr = data.as_ptr();
+            let v1 = _mm256_loadu_si256(mem::transmute(base_ptr));
+            let v2 = _mm256_loadu_si256(mem::transmute(base_ptr.add(4)));
             Self { values: [v1, v2] }
         }
     }
@@ -112,8 +113,9 @@ impl SimdCompare<i64, 8> for Avx2I64x2 {
     #[inline]
     fn storeu(input: Self, data: &mut [i64]) {
         unsafe {
-            _mm256_storeu_si256(mem::transmute(data.as_ptr()), input.values[0]);
-            _mm256_storeu_si256(mem::transmute(data[4..].as_ptr()), input.values[1]);
+            let base_ptr = data.as_mut_ptr();
+            _mm256_storeu_si256(mem::transmute(base_ptr), input.values[0]);
+            _mm256_storeu_si256(mem::transmute(base_ptr.add(4)), input.values[1]);
         }
     }
 
@@ -160,7 +162,7 @@ impl SimdCompare<i64, 8> for Avx2I64x2 {
 
     #[inline]
     fn get_value_at_idx(input: Self, idx: usize) -> i64 {
-        input.as_slice()[idx]
+        unsafe { *input.as_slice().get_unchecked(idx) }
     }
 
     #[inline]
@@ -266,29 +268,35 @@ impl SimdCompare<i64, 8> for Avx2I64x2 {
 
     #[inline]
     fn mask_compressstoreu(array: &mut [i64], mask: Self::OPMask, data: Self) {
+        // get_unchecked call is used to get rid of bound checks
         unsafe {
+            let base_ptr = array.as_mut_ptr();
             let bitmask1 = _mm256_movemask_pd(_mm256_castsi256_pd(mask.values[0])) as usize;
             let mask1 = _mm256_loadu_si256(mem::transmute(
-                COMPRESS_MASK[bitmask1.count_ones() as usize].as_ptr(),
+                COMPRESS_MASK
+                    .get_unchecked(bitmask1.count_ones() as usize)
+                    .as_ptr(),
             ));
             let v1 = _mm256_permutevar8x32_epi32(
                 data.values[0],
-                _mm256_loadu_si256(mem::transmute(COMPRESS_PERMUTATIONS[bitmask1].as_ptr())),
+                _mm256_loadu_si256(mem::transmute(
+                    COMPRESS_PERMUTATIONS.get_unchecked(bitmask1).as_ptr(),
+                )),
             );
-            _mm256_maskstore_epi64(array.as_mut_ptr(), mask1, v1);
+            _mm256_maskstore_epi64(base_ptr, mask1, v1);
             let bitmask2 = _mm256_movemask_pd(_mm256_castsi256_pd(mask.values[1])) as usize;
             let mask2 = _mm256_loadu_si256(mem::transmute(
-                COMPRESS_MASK[bitmask2.count_ones() as usize].as_ptr(),
+                COMPRESS_MASK
+                    .get_unchecked(bitmask2.count_ones() as usize)
+                    .as_ptr(),
             ));
             let v2 = _mm256_permutevar8x32_epi32(
                 data.values[1],
-                _mm256_loadu_si256(mem::transmute(COMPRESS_PERMUTATIONS[bitmask2].as_ptr())),
+                _mm256_loadu_si256(mem::transmute(
+                    COMPRESS_PERMUTATIONS.get_unchecked(bitmask2).as_ptr(),
+                )),
             );
-            _mm256_maskstore_epi64(
-                array[bitmask1.count_ones() as usize..].as_mut_ptr(),
-                mask2,
-                v2,
-            );
+            _mm256_maskstore_epi64(base_ptr.offset(bitmask1.count_ones() as isize), mask2, v2);
         }
     }
 }
