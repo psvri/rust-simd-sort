@@ -106,14 +106,10 @@ fn build_and_link_cpp_avx512_qsort() {
 #[cfg(not(feature = "cpp_vqsort"))]
 fn build_and_link_cpp_vqsort() {}
 
-#[cfg(not(feature = "cpp_vqsort_avx2"))]
-fn build_and_link_cpp_vqsort_avx2() {}
-
 #[cfg(not(feature = "cpp_avx512_qsort"))]
 fn build_and_link_cpp_avx512_qsort() {}
 
 fn main() {
     build_and_link_cpp_vqsort();
-    build_and_link_cpp_vqsort_avx2();
     build_and_link_cpp_avx512_qsort();
 }
