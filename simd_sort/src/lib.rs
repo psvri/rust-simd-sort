@@ -117,8 +117,20 @@ fn partition_vec<T: SimdSortable, const N: usize, U: SimdCompare<T, N>>(
     /* which elements are larger than the pivot */
     let gt_mask = U::ge(*curr_vec, *pivot_vec);
     let amount_gt_pivot = U::ones_count(gt_mask);
-    U::mask_compressstoreu(&mut data[left..], U::not_mask(gt_mask), *curr_vec);
-    U::mask_compressstoreu(&mut data[(right - amount_gt_pivot)..], gt_mask, *curr_vec);
+    // This is safe since we are accessing elements within bounds
+    // get_unchecked call is used to get rid of unwanted bounds check
+    unsafe {
+        U::mask_compressstoreu(
+            data.get_unchecked_mut(left..),
+            U::not_mask(gt_mask),
+            *curr_vec,
+        );
+        U::mask_compressstoreu(
+            data.get_unchecked_mut((right - amount_gt_pivot)..),
+            gt_mask,
+            *curr_vec,
+        );
+    }
     *smallest_vec = U::min(*curr_vec, *smallest_vec);
     *biggest_vec = U::max(*curr_vec, *biggest_vec);
     return amount_gt_pivot;
@@ -156,7 +168,9 @@ pub(crate) fn partition_avx512<T: SimdSortable, const N: usize, U: SimdCompare<T
     let mut max_vec = U::set(*biggest);
 
     if right - left == N {
-        let vec_ = U::loadu(&data[left..]);
+        // This is safe since we are in bounds
+        // get_unchecked call is used to get rid of bound checks
+        let vec_ = unsafe { U::loadu(data.get_unchecked(left..)) };
         let amount_gt_pivot = partition_vec(
             data,
             left,
@@ -254,9 +268,11 @@ where
 
     let mut i = (right - left) % (UNROLL * N);
     while i > 0 {
-        *smallest = min_by(*smallest, data[left], comparison_func);
-        *biggest = max_by(*biggest, data[left], comparison_func);
-        if comparison_func(&data[left], &pivot) != Ordering::Less {
+        // This is safe since left is in bounds
+        let other = unsafe { data.get_unchecked(left) };
+        *smallest = min_by(*smallest, *other, comparison_func);
+        *biggest = max_by(*biggest, *other, comparison_func);
+        if comparison_func(other, &pivot) != Ordering::Less {
             right -= 1;
             data.swap(left, right);
         } else {
@@ -277,18 +293,22 @@ where
     // left and right vtype::numlanes values are partitioned at the end
 
     let (vec_left, vec_right) = {
-        let mut vec_left: [MaybeUninit<U>; UNROLL] = unsafe { MaybeUninit::uninit().assume_init() };
-        let mut vec_right: [MaybeUninit<U>; UNROLL] =
-            unsafe { MaybeUninit::uninit().assume_init() };
-        for i in 0..UNROLL {
-            vec_left[i] = MaybeUninit::new(U::loadu(&data[(left + N * i)..]));
-            vec_right[i] = MaybeUninit::new(U::loadu(&data[(right - N * (UNROLL - i))..]));
-        }
+        // This is safe since we are loading data within bounds verified by the first if
+        // get_unchecked call is used to get rid of bound checks
+        unsafe {
+            let mut vec_left: [MaybeUninit<U>; UNROLL] = MaybeUninit::uninit().assume_init();
+            let mut vec_right: [MaybeUninit<U>; UNROLL] = MaybeUninit::uninit().assume_init();
+            for i in 0..UNROLL {
+                vec_left[i] = MaybeUninit::new(U::loadu(data.get_unchecked((left + N * i)..)));
+                vec_right[i] =
+                    MaybeUninit::new(U::loadu(data.get_unchecked((right - N * (UNROLL - i))..)));
+            }
 
-        (
-            unsafe { mem::transmute_copy::<_, [U; UNROLL]>(&vec_left) },
-            unsafe { mem::transmute_copy::<_, [U; UNROLL]>(&vec_right) },
-        )
+            (
+                mem::transmute_copy::<_, [U; UNROLL]>(&vec_left),
+                mem::transmute_copy::<_, [U; UNROLL]>(&vec_right),
+            )
+        }
     };
 
     // store points of the vectors
@@ -299,9 +319,10 @@ where
     right -= N * UNROLL;
 
     while right - left != 0 {
-        let current_vec = {
-            let mut current_vec: [MaybeUninit<U>; UNROLL] =
-                unsafe { MaybeUninit::uninit().assume_init() };
+        // This is safe since left and right are in bounds
+        // get_unchecked call is used to get rid of bound checks
+        let current_vec = unsafe {
+            let mut current_vec: [MaybeUninit<U>; UNROLL] = MaybeUninit::uninit().assume_init();
 
             /*
              * if fewer elements are stored on the right side of the array,
@@ -311,16 +332,18 @@ where
             if (r_store + N) - right < left - l_store {
                 right -= UNROLL * N;
                 for i in 0..UNROLL {
-                    current_vec[i] = MaybeUninit::new(U::loadu(&data[(right + (N * i))..]));
+                    current_vec[i] =
+                        MaybeUninit::new(U::loadu(data.get_unchecked((right + (N * i))..)));
                 }
             } else {
                 for i in 0..UNROLL {
-                    current_vec[i] = MaybeUninit::new(U::loadu(&data[(left + (N * i))..]));
+                    current_vec[i] =
+                        MaybeUninit::new(U::loadu(data.get_unchecked((left + (N * i))..)));
                 }
                 left += UNROLL * N;
             }
 
-            unsafe { mem::transmute_copy::<_, [U; UNROLL]>(&current_vec) }
+            mem::transmute_copy::<_, [U; UNROLL]>(&current_vec)
         };
 
         // partition the current vector and save it on both sides of the array

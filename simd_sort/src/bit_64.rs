@@ -722,22 +722,38 @@ where
     bitonic_merge_two_zmm_64bit(&mut zmm_12, &mut zmm_13);
     bitonic_merge_two_zmm_64bit(&mut zmm_14, &mut zmm_15);
 
-    let mut zmm_16_1 = [
-        zmm_0, zmm_1, zmm_2, zmm_3, zmm_4, zmm_5, zmm_6, zmm_7, zmm_8, zmm_9, zmm_10, zmm_11,
-        zmm_12, zmm_13, zmm_14, zmm_15, zmm_0, zmm_1, zmm_2, zmm_3, zmm_4, zmm_5, zmm_6, zmm_7,
-        zmm_8, zmm_9, zmm_10, zmm_11, zmm_12, zmm_13, zmm_14, zmm_15,
-    ];
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_1[0..4]);
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_1[4..8]);
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_1[8..12]);
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_1[12..]);
+    let mut zmm_4_1 = [zmm_0, zmm_1, zmm_2, zmm_3];
+    let mut zmm_4_2 = [zmm_4, zmm_5, zmm_6, zmm_7];
+    let mut zmm_4_3 = [zmm_8, zmm_9, zmm_10, zmm_11];
+    let mut zmm_4_4 = [zmm_12, zmm_13, zmm_14, zmm_15];
 
-    bitonic_merge_eight_zmm_64bit(&mut zmm_16_1[0..8]);
-    bitonic_merge_eight_zmm_64bit(&mut zmm_16_1[8..]);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_1);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_2);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_3);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_4);
+
+    let mut zmm_8_1 = [
+        zmm_4_1[0], zmm_4_1[1], zmm_4_1[2], zmm_4_1[3], zmm_4_2[0], zmm_4_2[1], zmm_4_2[2],
+        zmm_4_2[3],
+    ];
+
+    let mut zmm_8_2 = [
+        zmm_4_3[0], zmm_4_3[1], zmm_4_3[2], zmm_4_3[3], zmm_4_4[0], zmm_4_4[1], zmm_4_4[2],
+        zmm_4_4[3],
+    ];
+
+    bitonic_merge_eight_zmm_64bit(&mut zmm_8_1);
+    bitonic_merge_eight_zmm_64bit(&mut zmm_8_2);
+
+    let mut zmm_16_1 = [
+        zmm_8_1[0], zmm_8_1[1], zmm_8_1[2], zmm_8_1[3], zmm_8_1[4], zmm_8_1[5], zmm_8_1[6],
+        zmm_8_1[7], zmm_8_2[0], zmm_8_2[1], zmm_8_2[2], zmm_8_2[3], zmm_8_2[4], zmm_8_2[5],
+        zmm_8_2[6], zmm_8_2[7],
+    ];
 
     bitonic_merge_sixteen_zmm_64bit(&mut zmm_16_1);
 
-    let (mut zmm_16_2, data_splits) = {
+    let ([mut zmm_4_5, mut zmm_4_6, mut zmm_4_7, mut zmm_4_8], data_splits) = {
         if n >= 192 {
             let split_index = cmp::min(data_128_1.len(), 8);
             let (data_8_0, data_128_1) = data_128_1.split_at_mut(split_index);
@@ -815,8 +831,10 @@ where
 
             (
                 [
-                    zmm_0, zmm_1, zmm_2, zmm_3, zmm_4, zmm_5, zmm_6, zmm_7, zmm_8, zmm_9, zmm_10,
-                    zmm_11, zmm_12, zmm_13, zmm_14, zmm_15,
+                    [zmm_0, zmm_1, zmm_2, zmm_3],
+                    [zmm_4, zmm_5, zmm_6, zmm_7],
+                    [zmm_8, zmm_9, zmm_10, zmm_11],
+                    [zmm_12, zmm_13, zmm_14, zmm_15],
                 ],
                 [
                     data_8_0, data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7,
@@ -892,8 +910,10 @@ where
             bitonic_merge_two_zmm_64bit(&mut zmm_14, &mut zmm_15);
             (
                 [
-                    zmm_0, zmm_1, zmm_2, zmm_3, zmm_4, zmm_5, zmm_6, zmm_7, zmm_8, zmm_9, zmm_10,
-                    zmm_11, zmm_12, zmm_13, zmm_14, zmm_15,
+                    [zmm_0, zmm_1, zmm_2, zmm_3],
+                    [zmm_4, zmm_5, zmm_6, zmm_7],
+                    [zmm_8, zmm_9, zmm_10, zmm_11],
+                    [zmm_12, zmm_13, zmm_14, zmm_15],
                 ],
                 [
                     data_8_0, data_8_1, data_8_2, data_8_3, data_8_4, data_8_5, data_8_6, data_8_7,
@@ -904,14 +924,29 @@ where
         }
     };
 
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_2[0..4]);
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_2[4..8]);
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_2[8..12]);
-    bitonic_merge_four_zmm_64bit(&mut zmm_16_2[12..]);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_5);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_6);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_7);
+    bitonic_merge_four_zmm_64bit(&mut zmm_4_8);
 
-    bitonic_merge_eight_zmm_64bit(&mut zmm_16_2[0..8]);
-    bitonic_merge_eight_zmm_64bit(&mut zmm_16_2[8..]);
+    let mut zmm_8_3 = [
+        zmm_4_5[0], zmm_4_5[1], zmm_4_5[2], zmm_4_5[3], zmm_4_6[0], zmm_4_6[1], zmm_4_6[2],
+        zmm_4_6[3],
+    ];
 
+    let mut zmm_8_4 = [
+        zmm_4_7[0], zmm_4_7[1], zmm_4_7[2], zmm_4_7[3], zmm_4_8[0], zmm_4_8[1], zmm_4_8[2],
+        zmm_4_8[3],
+    ];
+
+    bitonic_merge_eight_zmm_64bit(&mut zmm_8_3);
+    bitonic_merge_eight_zmm_64bit(&mut zmm_8_4);
+
+    let mut zmm_16_2 = [
+        zmm_8_3[0], zmm_8_3[1], zmm_8_3[2], zmm_8_3[3], zmm_8_3[4], zmm_8_3[5], zmm_8_3[6],
+        zmm_8_3[7], zmm_8_4[0], zmm_8_4[1], zmm_8_4[2], zmm_8_4[3], zmm_8_4[4], zmm_8_4[5],
+        zmm_8_4[6], zmm_8_4[7],
+    ];
     bitonic_merge_sixteen_zmm_64bit(&mut zmm_16_2);
 
     let mut zmm = [
