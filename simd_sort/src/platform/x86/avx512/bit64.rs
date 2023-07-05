@@ -136,7 +136,7 @@ impl Bit64Simd<i64> for __m512i {
 }
 
 #[cfg(test)]
-#[cfg(target_feature="avx512f")]
+#[cfg(target_feature = "avx512f")]
 mod test {
     use crate::bit_64::test::*;
     use std::ops::*;

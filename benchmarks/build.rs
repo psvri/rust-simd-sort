@@ -89,19 +89,6 @@ fn build_and_link_cpp_vqsort() {
     );
 }
 
-#[cfg(all(feature = "cpp_vqsort_avx2", target_arch = "x86_64"))]
-fn build_and_link_cpp_vqsort_avx2() {
-    build_and_link_cpp_sort(
-        "cpp_vqsort",
-        Some(|builder: &mut cc::Build| {
-            builder.flag("-march=x86-64-v3");
-            builder.include(get_manifest_dir_path().join("other_implementations/vqsort"));
-            builder.compiler(CLANG_PATH);
-            None
-        }),
-    );
-}
-
 #[cfg(all(feature = "cpp_avx512_qsort", target_arch = "x86_64"))]
 fn build_and_link_cpp_avx512_qsort() {
     build_and_link_cpp_sort(
@@ -119,14 +106,10 @@ fn build_and_link_cpp_avx512_qsort() {
 #[cfg(not(feature = "cpp_vqsort"))]
 fn build_and_link_cpp_vqsort() {}
 
-#[cfg(not(feature = "cpp_vqsort_avx2"))]
-fn build_and_link_cpp_vqsort_avx2() {}
-
 #[cfg(not(feature = "cpp_avx512_qsort"))]
 fn build_and_link_cpp_avx512_qsort() {}
 
 fn main() {
     build_and_link_cpp_vqsort();
-    build_and_link_cpp_vqsort_avx2();
     build_and_link_cpp_avx512_qsort();
 }

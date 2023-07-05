@@ -1054,15 +1054,49 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_min_max_ $ty>]() {
-                    let first = $simd::loadu(&[1, 20, 3, 40, 5, 60, 70, 80]);
-                    let second = $simd::loadu(&[10, 2, 30, 4, 50, 6, 7, 8]);
+                    let first = $simd::loadu(&[
+                        1 as $ty,
+                        20 as $ty,
+                        3 as $ty ,
+                        40 as $ty,
+                        5 as $ty,
+                        60 as $ty,
+                        70 as $ty,
+                        80 as $ty]);
+                    let second = $simd::loadu(&[
+                        10 as $ty,
+                        2 as $ty,
+                        30 as $ty,
+                        4 as $ty,
+                        50 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty]);
                     assert_eq!(
                         $into_array(<$simd as SimdCompare<$ty, 8>>::min(first, second)),
-                        [1, 2, 3, 4, 5, 6, 7, 8]
+                        [
+                            1 as $ty,
+                            2 as $ty,
+                            3 as $ty,
+                            4 as $ty,
+                            5 as $ty,
+                            6 as $ty,
+                            7 as $ty,
+                            8 as $ty,
+                        ]
                     );
                     assert_eq!(
                         $into_array(<$simd as SimdCompare<$ty, 8>>::max(first, second)),
-                        [10, 20, 30, 40, 50, 60, 70, 80]
+                        [
+                            10 as $ty,
+                            20 as $ty,
+                            30 as $ty,
+                            40 as $ty,
+                            50 as $ty,
+                            60 as $ty,
+                            70 as $ty,
+                            80 as $ty,
+                        ]
                     );
                 }
             }
@@ -1074,11 +1108,42 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_loadu_storeu_ $ty>]() {
-                    let mut input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let mut input_slice = [
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                        9 as $ty,
+                        10 as $ty,
+                    ];
                     let first = $simd::loadu(input_slice.as_ref());
-                    assert_eq!($into_array(first), [1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    assert_eq!($into_array(first), [
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                    ]);
                     $simd::storeu(first, &mut input_slice[2..]);
-                    assert_eq!(input_slice, [1 as $ty, 2, 1, 2, 3, 4, 5, 6, 7, 8]);
+                    assert_eq!(input_slice, [
+                        1 as $ty,
+                        2 as $ty,
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                    ]);
                 }
             }
         };
@@ -1089,13 +1154,24 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_mask_loadu_mask_storeu_ $ty>]() {
-                    let mut input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let mut input_slice = [
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                        9 as $ty,
+                        10  as $ty,
+                    ];
                     let first = $simd::mask_loadu(&input_slice[..2]);
                     assert_eq!(
                         $into_array(first),
                         [
-                            1,
-                            2,
+                            1 as $ty,
+                            2 as $ty,
                             $ty::MAX,
                             $ty::MAX,
                             $ty::MAX,
@@ -1105,7 +1181,18 @@ pub(crate) mod test {
                         ]
                     );
                     $simd::mask_storeu(first, &mut input_slice[2..4]);
-                    assert_eq!(input_slice, [1 as $ty, 2, 1, 2, 5, 6, 7, 8, 9, 10]);
+                    assert_eq!(input_slice, [
+                        1 as $ty,
+                        2 as $ty,
+                        1 as $ty,
+                        2 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                        9 as $ty,
+                        10 as $ty,
+                    ]);
                 }
             }
         };
@@ -1116,7 +1203,16 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_get_at_index_ $ty>]() {
-                    let first = $simd::mask_loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    let first = $simd::mask_loadu(&[
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                    ]);
                     for i in 1..9 {
                         assert_eq!(i as $ty, $simd::get_value_at_idx(first, i - 1));
                     }
@@ -1130,8 +1226,25 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_ge_ $ty>]() {
-                    let first = $simd::mask_loadu(&[1 as $ty, 20, 3, 40, 5, 60, 7, 80]);
-                    let second = $simd::mask_loadu(&[10 as $ty, 2, 30, 40, 50, 6, 70, 80]);
+                    let first = $simd::mask_loadu(&[
+                        1 as $ty, 20 as $ty,
+                        3 as $ty,
+                        40 as $ty,
+                        5 as $ty,
+                        60 as $ty,
+                        7 as $ty,
+                        80 as $ty
+                    ]);
+                    let second = $simd::mask_loadu(&[
+                        10 as $ty,
+                        2 as $ty,
+                        30 as $ty,
+                        40 as $ty,
+                        50 as $ty,
+                        6 as $ty,
+                        70 as $ty,
+                        80 as $ty
+                    ]);
                     let result_mask = <$simd as SimdCompare<$ty, 8>>::ge(first, second);
                     assert_eq!(result_mask, $mask_result);
                 }
@@ -1144,9 +1257,29 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_gather_ $ty>]() {
-                    let input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let input_slice = [
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                        9 as $ty,
+                        10 as $ty,
+                    ];
                     let first = $simd::gather_from_idx([1, 1, 2, 2, 9, 9, 5, 6], input_slice.as_ref());
-                    assert_eq!($into_array(first), [2, 2, 3, 3, 10, 10, 6, 7]);
+                    assert_eq!($into_array(first), [
+                        2 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        3 as $ty,
+                        10 as $ty,
+                        10 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                    ]);
                 }
             }
         };
@@ -1183,9 +1316,18 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_reduce_min_max_ $ty>]() {
-                    let first = $simd::mask_loadu(&[1 as $ty, 6, 3, 4, 1, 2, 9, 8]);
-                    assert_eq!($simd::reducemin(first), 1);
-                    assert_eq!($simd::reducemax(first), 9);
+                    let first = $simd::mask_loadu(&[
+                        1 as $ty,
+                        6 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        1 as $ty,
+                        2 as $ty,
+                        9 as $ty,
+                        8 as $ty
+                    ]);
+                    assert_eq!($simd::reducemin(first), 1 as $ty);
+                    assert_eq!($simd::reducemax(first), 9 as $ty);
                 }
             }
         };
@@ -1196,7 +1338,17 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_compress_store_u_ $ty>]() {
-                    let input_slice = [1 as $ty, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    let input_slice = [
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                        9 as $ty,
+                        10 as $ty];
                     let first = $simd::loadu(input_slice.as_ref());
                     for i in 0..255 {
                         let (mask, new_values) = $generate_fn::<$ty, $mask_ty>(i, &input_slice);
@@ -1223,10 +1375,28 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_shuffle1_1_1_1_ $ty>]() {
-                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
+                    let first = $simd::loadu(&[
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8  as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::shuffle1_1_1_1(first)),
-                        [2  as $ty, 1, 4, 3, 6, 5, 8, 7]
+                        [
+                            2 as $ty,
+                            1 as $ty,
+                            4 as $ty,
+                            3 as $ty,
+                            6 as $ty,
+                            5 as $ty,
+                            8 as $ty,
+                            7 as $ty,
+                        ]
                     );
                 }
             }
@@ -1238,11 +1408,38 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_swizzle2_0xaa_ $ty>]() {
-                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
-                    let second = $simd::loadu(&[10 as $ty, 20, 30, 40, 50, 60, 70, 80]);
+                    let first = $simd::loadu(&[
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8 as $ty,
+                    ]);
+                    let second = $simd::loadu(&[
+                        10 as $ty,
+                        20 as $ty,
+                        30 as $ty,
+                        40 as $ty,
+                        50 as $ty,
+                        60 as $ty,
+                        70 as $ty,
+                        80 as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::swizzle2_0xaa(first, second)),
-                        [1, 20, 3, 40, 5, 60, 7, 80]
+                        [
+                            1 as $ty,
+                            20 as $ty,
+                            3 as $ty,
+                            40 as $ty,
+                            5 as $ty,
+                            60 as $ty,
+                            7 as $ty,
+                            80 as $ty
+                        ]
                     );
                 }
             }
@@ -1254,11 +1451,39 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_swizzle2_0xcc_ $ty>]() {
-                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
-                    let second = $simd::loadu(&[10 as $ty, 20, 30, 40, 50, 60, 70, 80]);
+                    let first = $simd::loadu(&[
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8  as $ty
+                    ]);
+                    let second = $simd::loadu(&[
+                        10 as $ty,
+                        20 as $ty,
+                        30 as $ty,
+                        40 as $ty,
+                        50 as $ty,
+                        60 as $ty,
+                        70 as $ty,
+                        80 as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::swizzle2_0xcc(first, second)),
-                        [1, 2, 30, 40, 5, 6, 70, 80]
+                        [
+                            1 as $ty,
+                            2 as $ty,
+                            30 as $ty,
+                            40 as $ty,
+                            5 as $ty,
+                            6 as $ty,
+                            70 as $ty,
+                            80 as $ty
+
+                       ]
                     );
                 }
             }
@@ -1270,11 +1495,38 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_swizzle2_0xf0_ $ty>]() {
-                    let first = $simd::loadu(&[1 as $ty, 2, 3, 4, 5, 6, 7, 8]);
-                    let second = $simd::loadu(&[10 as $ty, 20, 30, 40, 50, 60, 70, 80]);
+                    let first = $simd::loadu(&[
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty,
+                        8  as $ty
+                    ]);
+                    let second = $simd::loadu(&[
+                        10 as $ty,
+                        20 as $ty,
+                        30 as $ty,
+                        40 as $ty,
+                        50 as $ty,
+                        60 as $ty,
+                        70 as $ty,
+                        80 as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::swizzle2_0xf0(first, second)),
-                        [1, 2, 3, 4, 50, 60, 70, 80]
+                        [
+                            1 as $ty,
+                            2 as $ty,
+                            3 as $ty,
+                            4 as $ty,
+                            50 as $ty,
+                            60 as $ty,
+                            70 as $ty,
+                            80 as $ty,
+                        ]
                     );
                 }
             }
@@ -1286,10 +1538,28 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<network64bit1_ $ty>]() {
-                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    let first = $simd::loadu(&[
+                        0 as $ty,
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::network64bit1(first)),
-                        [3  as $ty, 2, 1, 0, 7, 6, 5, 4]
+                        [
+                            3 as $ty,
+                            2 as $ty,
+                            1 as $ty,
+                            0 as $ty,
+                            7 as $ty,
+                            6 as $ty,
+                            5 as $ty,
+                            4 as $ty,
+                        ]
                     );
                 }
             }
@@ -1301,10 +1571,28 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<network64bit2_ $ty>]() {
-                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    let first = $simd::loadu(&[
+                        0 as $ty,
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::network64bit2(first)),
-                        [7  as $ty, 6, 5, 4, 3, 2, 1, 0]
+                        [
+                            7 as $ty,
+                            6 as $ty,
+                            5 as $ty,
+                            4 as $ty,
+                            3 as $ty,
+                            2 as $ty,
+                            1 as $ty,
+                            0 as $ty
+                        ]
                     );
                 }
             }
@@ -1316,10 +1604,28 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<network64bit3_ $ty>]() {
-                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    let first = $simd::loadu(&[
+                        0 as $ty,
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::network64bit3(first)),
-                        [2  as $ty, 3, 0, 1, 6, 7, 4, 5]
+                        [
+                            2 as $ty,
+                            3 as $ty,
+                            0 as $ty,
+                            1 as $ty,
+                            6 as $ty,
+                            7 as $ty,
+                            4 as $ty,
+                            5 as $ty
+                        ]
                     );
                 }
             }
@@ -1331,10 +1637,28 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<network64bit4_ $ty>]() {
-                    let first = $simd::loadu(&[0 as $ty, 1, 2, 3, 4, 5, 6, 7]);
+                    let first = $simd::loadu(&[
+                        0 as $ty,
+                        1 as $ty,
+                        2 as $ty,
+                        3 as $ty,
+                        4 as $ty,
+                        5 as $ty,
+                        6 as $ty,
+                        7 as $ty
+                    ]);
                     assert_eq!(
                         $into_array($simd::network64bit4(first)),
-                        [4  as $ty, 5, 6, 7, 0, 1, 2, 3]
+                        [
+                            4 as $ty,
+                            5 as $ty,
+                            6 as $ty,
+                            7 as $ty,
+                            0 as $ty,
+                            1 as $ty,
+                            2 as $ty,
+                            3 as $ty,
+                        ]
                     );
                 }
             }
@@ -1346,7 +1670,7 @@ pub(crate) mod test {
             paste::paste! {
                 #[test]
                 fn [<test_sort_ $n _ $ty >]() {
-                    let result: Vec<i64> = (0 as $ty..$n).into_iter().collect();
+                    let result: Vec<$ty> = (0..$n).into_iter().map(|x| x as $ty).collect();
                     for i in 0..$n {
                         let mut array = Vec::with_capacity(i);
                         array.extend_from_slice(&result[..i]);
@@ -1366,7 +1690,7 @@ pub(crate) mod test {
                 fn [<test_sort_e2e_ $ty >]() {
                     let start = 0;
                     let end = 1024;
-                    let result: Vec<$ty> = (0 as $ty..end).into_iter().collect();
+                    let result: Vec<$ty> = (0..end).into_iter().map(|x| x as $ty).collect();
                     for i in start as usize..end as usize {
                         let mut array = Vec::with_capacity(i);
                         array.extend_from_slice(&result[..i]);

@@ -280,12 +280,12 @@ mod test {
         ]
     }
 
-    fn generate_mask_answer<T, M>(bitmask: usize, values: &[T]) -> (M, [T; 8]) 
+    fn generate_mask_answer<T, M>(bitmask: usize, values: &[T]) -> (M, [T; 8])
     where
         T: TryFrom<usize> + Default + Copy,
         <T as TryFrom<usize>>::Error: Debug,
         M: TryFrom<usize>,
-        <M as TryFrom<usize>>::Error: Debug
+        <M as TryFrom<usize>>::Error: Debug,
     {
         let mut new_values = [<T as Default>::default(); 8];
         let mut count = 0;

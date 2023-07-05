@@ -50,13 +50,13 @@ pub trait SimdCompare<T: SimdSortable, const NUM_LANES: usize>: Copy + Debug {
 }
 
 #[cfg(feature = "nightly")]
-pub trait SimdSortable: PartialOrd + SimdElement + std::fmt::Debug {
+pub trait SimdSortable: PartialOrd + SimdElement + Debug {
     const MAX_VALUE: Self;
     const MIN_VALUE: Self;
 }
 
 #[cfg(not(feature = "nightly"))]
-pub trait SimdSortable: PartialOrd + Copy {
+pub trait SimdSortable: PartialOrd + Copy + Debug {
     const MAX_VALUE: Self;
     const MIN_VALUE: Self;
 }
