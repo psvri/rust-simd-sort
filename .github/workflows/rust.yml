@@ -125,6 +125,6 @@ jobs:
     - name: Bench
       run: |
         cd benchmarks
-        cargo bench --verbose --no-default-features --features="rust_std_unstable,nightly,cpp_vqsort_avx2"
+        cargo bench --verbose --no-default-features --features="rust_std_unstable,nightly,cpp_vqsort"
       env:
         RUSTFLAGS: -C target-cpu=${{ matrix.native_target }}
