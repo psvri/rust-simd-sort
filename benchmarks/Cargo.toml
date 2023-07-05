@@ -12,11 +12,10 @@ wasm-opt = false
 simd-sort = {path="../simd_sort"}
 
 [features]
-default = []
+default = ["rust_std_unstable"]
 nightly = ["simd-sort/nightly"]
 rust_std_unstable = []
 cpp_vqsort = []
-cpp_vqsort_avx2 = []
 cpp_avx512_qsort = []
 
 [build-dependencies]

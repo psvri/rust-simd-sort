@@ -1,4 +1,3 @@
-#include "hwy/contrib/sort/vqsort_i64a.cc"
 #include "hwy/contrib/sort/vqsort.h"
 #include "hwy/contrib/sort/vqsort-inl.h"
 #include "hwy/contrib/sort/vqsort.cc"
@@ -9,6 +8,11 @@ extern "C"
 {
     void vqsort_i64(int64_t *data, size_t len)
     {
-        hwy::HWY_NAMESPACE::SortI64Asc(data, len);
+        hwy::HWY_NAMESPACE::VQSortStatic(data, len, hwy::SortAscending());
+    }
+
+    void vqsort_f64(double *data, size_t len)
+    {
+        hwy::HWY_NAMESPACE::VQSortStatic(data, len, hwy::SortAscending());
     }
 }
