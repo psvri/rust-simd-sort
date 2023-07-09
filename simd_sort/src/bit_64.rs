@@ -1326,7 +1326,7 @@ pub(crate) mod test {
                 #[test]
                 fn [<test_not_ $ty>]() {
                     let first: <$simd as SimdCompare<$ty, 8>>::OPMask = $mask_input;
-                    assert_eq!($simd::not_mask(first), $mask_result);
+                    assert_eq!(<$simd as SimdCompare<$ty, 8>>::not_mask(first), $mask_result);
                 }
             }
         };
@@ -1339,7 +1339,7 @@ pub(crate) mod test {
                 fn [<test_count_ones_ $ty>]() {
                     for i in 0u8..8 {
                         let mask = $mask_fn(i);
-                        assert_eq!($simd::ones_count(mask), i.count_ones() as usize);
+                        assert_eq!(<$simd as SimdCompare<$ty, 8>>::ones_count(mask), i.count_ones() as usize);
                     }
                 }
             }
@@ -1361,8 +1361,8 @@ pub(crate) mod test {
                         9 as $ty,
                         8 as $ty
                     ]);
-                    assert_eq!($simd::reducemin(first), 1 as $ty);
-                    assert_eq!($simd::reducemax(first), 9 as $ty);
+                    assert_eq!(<$simd as SimdCompare<$ty, 8>>::reducemin(first), 1 as $ty);
+                    assert_eq!(<$simd as SimdCompare<$ty, 8>>::reducemax(first), 9 as $ty);
                 }
             }
         };
@@ -1393,7 +1393,7 @@ pub(crate) mod test {
                         format!("{:?}", new_array);
                         format!("{:?}", new_values);
                         println!("{:?}", new_array);
-                        for j in 0..i.count_ones() as usize {
+                        for j in 0..(i as usize).count_ones() as usize {
                             assert_eq!(new_array[2 + j], new_values[j]);
                         }
                         for j in i as usize..8 {
@@ -1421,7 +1421,7 @@ pub(crate) mod test {
                         8  as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::shuffle1_1_1_1(first)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::shuffle1_1_1_1(first)),
                         [
                             2 as $ty,
                             1 as $ty,
@@ -1464,7 +1464,7 @@ pub(crate) mod test {
                         80 as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::swizzle2_0xaa(first, second)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::swizzle2_0xaa(first, second)),
                         [
                             1 as $ty,
                             20 as $ty,
@@ -1507,7 +1507,7 @@ pub(crate) mod test {
                         80 as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::swizzle2_0xcc(first, second)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::swizzle2_0xcc(first, second)),
                         [
                             1 as $ty,
                             2 as $ty,
@@ -1551,7 +1551,7 @@ pub(crate) mod test {
                         80 as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::swizzle2_0xf0(first, second)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::swizzle2_0xf0(first, second)),
                         [
                             1 as $ty,
                             2 as $ty,
@@ -1584,7 +1584,7 @@ pub(crate) mod test {
                         7 as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::network64bit1(first)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::network64bit1(first)),
                         [
                             3 as $ty,
                             2 as $ty,
@@ -1617,7 +1617,7 @@ pub(crate) mod test {
                         7 as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::network64bit2(first)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::network64bit2(first)),
                         [
                             7 as $ty,
                             6 as $ty,
@@ -1650,7 +1650,7 @@ pub(crate) mod test {
                         7 as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::network64bit3(first)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::network64bit3(first)),
                         [
                             2 as $ty,
                             3 as $ty,
@@ -1683,7 +1683,7 @@ pub(crate) mod test {
                         7 as $ty
                     ]);
                     assert_eq!(
-                        $into_array($simd::network64bit4(first)),
+                        $into_array(<$simd as Bit64Simd<$ty>>::network64bit4(first)),
                         [
                             4 as $ty,
                             5 as $ty,

@@ -11,6 +11,11 @@ extern "C"
         hwy::HWY_NAMESPACE::VQSortStatic(data, len, hwy::SortAscending());
     }
 
+    void vqsort_u64(uint64_t *data, size_t len)
+    {
+        hwy::HWY_NAMESPACE::VQSortStatic(data, len, hwy::SortAscending());
+    }
+
     void vqsort_f64(double *data, size_t len)
     {
         hwy::HWY_NAMESPACE::VQSortStatic(data, len, hwy::SortAscending());
