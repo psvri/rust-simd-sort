@@ -1,8 +1,6 @@
 #![cfg_attr(feature = "nightly", feature(portable_simd))]
 
-use std::fmt::Debug;
-
-use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion, Throughput};
 use paste::paste;
 use rand::{distributions::Standard, prelude::Distribution, rngs::StdRng, Rng, SeedableRng};
 use simd_sort;
@@ -86,85 +84,112 @@ macro_rules! cpp_vqsort {
 macro_rules! avx2_sort {
     ($c: ident, $ty: ident, $name: literal, $sort_fn: ident) => {
         paste! {
-            #[cfg(all(target_feature = "avx2", target_arch = "x86_64"))]
+            #[cfg(target_arch = "x86_64")]
             {
-                let data = create_uniform_data::<$ty>(1024 * 1024);
-                use simd_sort::platform::x86::avx2::$sort_fn;
-                let data_t = data.clone();
-                $c.bench_function($name, move |b| {
-                    // This will avoid timing the to_vec call.
-                    b.iter_batched(
-                        || data_t.clone(),
-                        |mut data| {
-                            $sort_fn(data.as_mut_slice());
-                            black_box(data);
-                        },
-                        BatchSize::LargeInput,
-                    )
-                });
+                if std::is_x86_feature_detected!("avx2") {
+                    let data = create_uniform_data::<$ty>(1024 * 1024);
+                    use simd_sort::platform::x86::avx2::$sort_fn;
+                    let data_t = data.clone();
+                    $c.bench_function($name, move |b| {
+                        // This will avoid timing the to_vec call.
+                        b.iter_batched(
+                            || data_t.clone(),
+                            |mut data| {
+                                $sort_fn(data.as_mut_slice());
+                                black_box(data);
+                            },
+                            BatchSize::LargeInput,
+                        )
+                    });
+                }
+            }
+        }
+    };
+}
+
+macro_rules! cpp_avx512_qsort {
+    ($c: ident, $ty: ident, $name: literal, $sort_fn: ident) => {
+        paste! {
+            #[cfg(all(feature = "cpp_avx512_qsort", target_arch = "x86_64"))]
+            {
+                if std::is_x86_feature_detected!("avx512f") {
+                    let data = create_uniform_data::<$ty>(1024 * 1024);
+                    extern "C" {
+                        fn [<avx512_qsort_ $ty>](data: *mut $ty, size: usize);
+                    }
+                    unsafe {
+                        let mut temp1 = data.clone();
+                        let mut temp2 = data.clone();
+                        [<avx512_qsort_ $ty>](temp1.as_mut_ptr(), temp1.len());
+                        $sort_fn(&mut temp2);
+                        assert_eq!(temp1, temp2);
+                        let data_t = data.clone();
+                        $c.bench_function($name, move |b| {
+                            // This will avoid timing the to_vec call.
+                            b.iter_batched(
+                                || data_t.clone(),
+                                |mut data| {
+                                    [<avx512_qsort_ $ty>](data.as_mut_ptr(), data.len());
+                                    black_box(data);
+                                },
+                                BatchSize::LargeInput,
+                            )
+                        });
+                    }
+                }
+            }
+        }
+    };
+}
+
+macro_rules! avx512_sort {
+    ($c: ident, $ty: ident, $name: literal, $sort_fn: ident) => {
+        paste! {
+            #[cfg(target_arch = "x86_64")]
+            {
+                if std::is_x86_feature_detected!("avx512f") {
+                    let data = create_uniform_data::<$ty>(1024 * 1024);
+                    use simd_sort::platform::x86::avx512::$sort_fn;
+                    let data_t = data.clone();
+                    $c.bench_function($name, move |b| {
+                        // This will avoid timing the to_vec call.
+                        b.iter_batched(
+                            || data_t.clone(),
+                            |mut data| {
+                                $sort_fn(data.as_mut_slice());
+                                black_box(data);
+                            },
+                            BatchSize::LargeInput,
+                        )
+                    });
+                }
             }
         }
     };
 }
 
 pub fn criterion_benchmark(c: &mut Criterion) {
-    let data = create_uniform_data::<i64>(1024 * 1024);
+    let mut group = c.benchmark_group("sort benchmarks");
+    group.throughput(Throughput::Bytes(1024 * 1024 * 8));
 
-    rust_std_unstable!(c, i64, "rust_std_unstable_i64", slice_sort_unstable);
-    rust_std_unstable!(c, f64, "rust_std_unstable_f64", slice_sort_unstable_by);
+    rust_std_unstable!(group, i64, "rust_std_unstable_i64", slice_sort_unstable);
+    rust_std_unstable!(group, u64, "rust_std_unstable_u64", slice_sort_unstable);
+    rust_std_unstable!(group, f64, "rust_std_unstable_f64", slice_sort_unstable_by);
 
-    cpp_vqsort!(c, i64, "cpp_vqsort_i64", slice_sort_unstable);
-    cpp_vqsort!(c, f64, "cpp_vqsort_f64", slice_sort_unstable_by);
+    cpp_vqsort!(group, i64, "cpp_vqsort_i64", slice_sort_unstable);
+    cpp_vqsort!(group, u64, "cpp_vqsort_u64", slice_sort_unstable);
+    cpp_vqsort!(group, f64, "cpp_vqsort_f64", slice_sort_unstable_by);
 
-    avx2_sort!(c, i64, "avx2_i64", avx2_sort_i64);
-    avx2_sort!(c, f64, "avx2_f64", avx2_sort_f64);
+    avx2_sort!(group, i64, "avx2_i64", avx2_sort_i64);
+    avx2_sort!(group, f64, "avx2_f64", avx2_sort_f64);
 
-    #[cfg(all(feature = "cpp_avx512_qsort", target_arch = "x86_64"))]
-    {
-        extern "C" {
-            fn avx512_qsort_i64(data: *mut i64, size: usize);
-        }
-        unsafe {
-            let mut temp1 = data.clone();
-            let mut temp2 = data.clone();
-            avx512_qsort_i64(temp1.as_mut_ptr(), temp1.len());
-            temp2.sort();
-            assert_eq!(temp1, temp2);
-            let data_t = data.clone();
-            c.bench_function("cpp_avx512_qsort", move |b| {
-                // This will avoid timing the to_vec call.
-                b.iter_batched(
-                    || data_t.clone(),
-                    |mut data| {
-                        avx512_qsort_i64(data.as_mut_ptr(), data.len());
-                        black_box(data);
-                    },
-                    BatchSize::LargeInput,
-                )
-            });
-        }
-    }
+    cpp_avx512_qsort!(group, i64, "cpp_avx512_qsort_i64", slice_sort_unstable);
+    cpp_avx512_qsort!(group, u64, "cpp_avx512_qsort_u64", slice_sort_unstable);
+    cpp_avx512_qsort!(group, f64, "cpp_avx512_qsort_f64", slice_sort_unstable_by);
 
-    #[cfg(all(
-        target_feature = "avx512f",
-        target_arch = "x86_64",
-        feature = "nightly"
-    ))]
-    {
-        use simd_sort::platform::x86::avx512::avx512_sort_i64;
-        let data_t = data.clone();
-        c.bench_function("avx512", move |b| {
-            // This will avoid timing the to_vec call.
-            b.iter_batched(
-                || data_t.clone(),
-                |mut data| {
-                    avx512_sort_i64(data.as_mut_slice());
-                    black_box(data);
-                },
-                BatchSize::LargeInput,
-            )
-        });
-    }
+    avx512_sort!(group, i64, "avx512_i64", avx512_sort_i64);
+    avx512_sort!(group, f64, "avx512_f64", avx512_sort_f64);
+    avx512_sort!(group, u64, "avx512_u64", avx512_sort_u64);
 
     #[cfg(all(target_feature = "simd128", target_arch = "wasm32"))]
     {
@@ -183,10 +208,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         });
     }
 
+    let data = create_uniform_data::<i64>(1024 * 1024);
     {
         use simd_sort::platform::sort_i64;
         let data_t = data.clone();
-        c.bench_function("best_runtime", move |b| {
+        group.bench_function("best_runtime", move |b| {
             // This will avoid timing the to_vec call.
             b.iter_batched(
                 || data_t.clone(),
@@ -203,7 +229,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     {
         use simd_sort::platform::nightly::portable_simd_sort_i64;
         let data_t = data.clone();
-        c.bench_function("portable_simd_sort", move |b| {
+        group.bench_function("portable_simd_sort", move |b| {
             // This will avoid timing the to_vec call.
             b.iter_batched(
                 || data_t.clone(),

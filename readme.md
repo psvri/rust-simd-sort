@@ -4,9 +4,9 @@ Simd sorting implementation based on [intel simd sort](https://github.com/intel/
 
 ## Supported DataTypes
 
-|   | i64 |
-|---|-----|
-| avx2 | ✓ |
-| avx512 | ✓ |
-| wasm-simd128 | ✓ |
-| portable-simd | ✓ |
+|   | i64 | u64 | f64 |
+|---|-----|-----|-----|
+| avx2 | ✓ | | |
+| avx512 | ✓ | ✓ | ✓ |
+| wasm-simd128 | ✓ | | |
+| portable-simd | ✓ | | |
